@@ -31,7 +31,7 @@ class AuctionManager extends ManagedService implements Logger {
 	@dereferenced
 	protected VectorMap<SceneObject, string> pendingOldUIDUpdates;
 
-	public final static int MAXBAZAARPRICE = 20000;
+	public final static int MAXBAZAARPRICE = 500000;
 	public final static int MAXSALES = 25; // this only apply to bazaars
 	public final static int SALESFEE = 20;
 	public final static int CHECKEVERY = 60; // Minutes
@@ -147,5 +147,12 @@ class AuctionManager extends ManagedService implements Logger {
 	public ZoneServer getZoneServer() {
 		return zoneServer;
 	}
+
+	@local
+	public native void bazaarBotListItem(CreatureObject player, SceneObject objectToSell, SceneObject vendor, final unicode description, int price);
+	
+	@local
+	public native void bazaarBotLogSale(final string playerName, final string itemName, int price);
+
 }
 

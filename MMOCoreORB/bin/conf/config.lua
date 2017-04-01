@@ -56,7 +56,7 @@ DBPort = 3306
 DBName = "swgemu"
 DBUser = "swgemu"
 DBPass = "123456"
-DBSecret = "swgemus3cr37!" -- Change this! This value should be unique and of reasonable length.
+DBSecret = "mys3cr37!" -- Change this! This value should be unique and of reasonable length.
 
 LoginPort = 44453
 LoginProcessingThreads = 1
@@ -91,53 +91,54 @@ ZonesEnabled = {
 	--"11",
 	--"character_farm",
 	--"cinco_city_test_m5",
-	--"corellia",
+	"corellia",
 	--"creature_test",
-	--"dantooine",
-	--"dathomir",
+	"dantooine",
+	"dathomir",
 	--"dungeon1",
-	--"endor",
+	"endor",
 	--"endor_asommers",
 	--"floratest",
 	--"godclient_test",
-	--"lok",
-	--"naboo",
+	"lok",
+	"naboo",
 	--"otoh_gunga",
 	--"rivertest",
-	--"rori",
+	"rori",
 	--"runtimerules",
 	--"simple",
 	--"space_09",
-	--"space_corellia",
-	--"space_corellia_2",
-	--"space_dantooine",
-	--"space_dathomir",
-	--"space_endor",
-	--"space_env",
-	--"space_halos",
-	--"space_heavy1",
-	--"space_light1",
-	--"space_lok",
-	--"space_naboo",
-	--"space_naboo_2",
-	--"space_tatooine",
-	--"space_tatooine_2",
-	--"space_yavin4",
+	"space_corellia",
+	"space_corellia_2",
+	"space_dantooine",
+	"space_dathomir",
+	"space_endor",
+	"space_env",
+	"space_halos",
+	"space_heavy1",
+	"space_light1",
+	"space_lok",
+	"space_naboo",
+	"space_naboo_2",
+	"space_tatooine",
+	"space_tatooine_2",
+	"space_yavin4",
 	--"taanab",
-	--"talus",
+	"talus",
 	"tatooine",
 	--"test_wearables",
 	"tutorial",
 	--"umbra",
 	--"watertabletest",
-	--"yavin4"
+	"yavin4"
 }
 
 
 -- directory of tres with live.cfg
-TrePath = "/home/swgemu/Desktop/SWGEmu"
+TrePath = "/home/shikage/swgemu/data"
 
 TreFiles = {
+	"top_house_assets.tre",
 	"default_patch.tre",
 	"patch_sku1_14_00.tre",
 	"patch_14_00.tre",
@@ -188,7 +189,8 @@ TreFiles = {
 	"data_sample_01.tre",
 	"data_sample_00.tre",
 	"data_music_00.tre",
-	"bottom.tre"
+	"bottom.tre",
+	"bottom_house_assets.tre"
 }
 
 --Status Server Config

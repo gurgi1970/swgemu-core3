@@ -196,4 +196,7 @@ class LootManager extends ManagedService implements Logger {
 		return crystalData.get(name);
 	}
 
+	@local
+	public native TangibleObject bazaarBotCreateLoot(final string lootItem, int level = -1, boolean maxCondition = false);
+
 }
