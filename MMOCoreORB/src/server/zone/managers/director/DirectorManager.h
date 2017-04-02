@@ -192,6 +192,14 @@ namespace server {
 		static int printLuaError(lua_State* L);
 		static int getSpawnPointInArea(lua_State* L);
 
+		// BazaarBot
+		static int bazaarBotListItem(lua_State* L);
+		static int bazaarBotMakeCraftedItem(lua_State* L);
+		static int bazaarBotMakeLootItem(lua_State* L);
+		static int bazaarBotMakeResources(lua_State* L);
+		static int getRandomInSpawnResource(lua_State* L);
+		static int logToFile(lua_State* L);
+
 	private:
 		void setupLuaPackagePath(Lua* luaEngine);
 		static void printTraceError(lua_State* L, const String& error);

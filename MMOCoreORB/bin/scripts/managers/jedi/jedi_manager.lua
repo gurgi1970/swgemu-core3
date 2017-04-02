@@ -11,7 +11,8 @@ if _TEST then
 	ITEMTHEATERDATAPAD = 2
 end
 
-jediProgressionType = VILLAGEJEDIPROGRESSION
+--jediProgressionType = VILLAGEJEDIPROGRESSION
+jediProgressionType = HOLOGRINDJEDIPROGRESSION
 
 jediManagerName = "JediManager"
 
@@ -22,7 +23,8 @@ function printf(...) io.write(string.format(table.unpack({...}))) end
 JediManager = ScreenPlay:new {
 	screenplayName = jediManagerName,
 	jediManagerName = jediManagerName,
-	jediProgressionType = NOJEDIPROGRESSION,
+	--jediProgressionType = NOJEDIPROGRESSION,
+	jediProgressionType = HOLOGRINDJEDIPROGRESSION,
 }
 
 -- Default handling of the start event.
