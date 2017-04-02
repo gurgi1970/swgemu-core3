@@ -1,8 +1,8 @@
 BBWeaponsConfig = {
 	path = "object/draft_schematic/weapon/",
 	qualityMin = 40,
-	qualityAvg = 50, -- 10% chance to use this as the min value and qualityMax as the max value
-	qualityMax = 55, -- 1% Chance to get up to +5 to the max value, with qualityMax as the min value
+	qualityAvg = 60, -- 10% chance to use this as the min value and qualityMax as the max value
+	qualityMax = 95, -- 1% Chance to get up to +5 to the max value, with qualityMax as the min value
 	freq = 14590, -- Every x seconds
 	eventName = "BazaarBotAddWeapons",
 	functionName = "addMoreWeapons",

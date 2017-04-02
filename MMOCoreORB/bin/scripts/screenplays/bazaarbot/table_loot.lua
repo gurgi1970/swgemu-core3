@@ -2,7 +2,7 @@ BBLootConfig = {
 	freq = 900, -- how often to generate a listing, in seconds
 	quantity = 1, -- how many times unique loot is generated per scheduled task
 	minLevel = 10, 
-	maxLevel = 100, -- 300 is the game's max level
+	maxLevel = 200, -- 300 is the game's max level
 	eventName = "BazaarBotAddLoot",
 	functionName = "addMoreLoot",
 }
@@ -598,6 +598,7 @@ BBLootItems = {
 	{
 	-- Misc
 	"force_color_crystal",
+        "force_power_crystal",
 	"bubble_tank_schematic",
 	"kimogila_bone_segment",
 	"kimogila_scales",

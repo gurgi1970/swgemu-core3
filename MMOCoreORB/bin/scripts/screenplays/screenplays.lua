@@ -616,5 +616,5 @@ includeFile("record_keepers/record_keepers.lua")
 includeFile("tests/tests.lua")
 
 --BazaarBot
-includeFile("bazaar/BazaarBot.lua")
+includeFile("bazaarbot/BazaarBot.lua")
 

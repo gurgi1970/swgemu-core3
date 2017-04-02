@@ -1,8 +1,8 @@
 BBArmorConfig = {
 	path = "object/draft_schematic/clothing/clothing_armor_",
 	qualityMin = 45,
-	qualityAvg = 50, -- 10% chance to use this as the min value and qualityMax as the max value
-	qualityMax = 60, -- 1% Chance to get up to +5 to the max value, with qualityMax as the min value
+	qualityAvg = 60, -- 10% chance to use this as the min value and qualityMax as the max value
+	qualityMax = 95, -- 1% Chance to get up to +5 to the max value, with qualityMax as the min value
 	freq = 144100, -- Every x seconds
 	eventName = "BazaarBotAddArmor",
 	functionName = "addMoreArmor",
