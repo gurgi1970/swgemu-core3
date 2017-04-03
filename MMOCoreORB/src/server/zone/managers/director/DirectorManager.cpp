@@ -377,6 +377,7 @@ void DirectorManager::initializeLuaEngine(Lua* luaEngine) {
 	lua_register(luaEngine->getLuaState(), "bazaarBotMakeResources", bazaarBotMakeResources);
 	lua_register(luaEngine->getLuaState(), "getRandomInSpawnResource", getRandomInSpawnResource);
 	lua_register(luaEngine->getLuaState(), "logToFile", logToFile);
+	lua_register(luaEngine->getLuaState(), "bazaarBotBuyItem", bazaarBotBuyItem);
 
 	//Navigation Mesh Management
 	lua_register(luaEngine->getLuaState(), "createNavMesh", createNavMesh);
@@ -3692,3 +3693,13 @@ int DirectorManager::logToFile(lua_State* L){
 	return 0;
 }
 
+int DirectorManager::bazaarBotBuyItem(lua_State* L) {
+	Reference<CreatureObject*> player = (CreatureObject*)lua_touserdata(L, -1);
+        AuctionManager* auctionManager = ServerCore::getZoneServer()->getAuctionManager();
+
+        if (auctionManager != NULL) {
+		auctionManager->bazaarBotBuyItem(player);
+	}
+
+        return 0;
+}

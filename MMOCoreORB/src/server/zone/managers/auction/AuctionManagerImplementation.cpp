@@ -579,6 +579,22 @@ void AuctionManagerImplementation::bazaarBotLogSale(const String& buyerName, con
 	delete writer;
 }
 
+void AuctionManagerImplementation::bazaarBotLogPurchase(const String& sellerName, const String& itemName, int price) {
+	time_t now = time(0);
+	String dt = ctime(&now);
+	String timeStamp = dt.replaceAll("\n", "");
+	
+	StringBuffer msg;
+	msg << timeStamp << ": " << itemName << " (" << sellerName << ") " << String::valueOf(price) << "cr" << endl;
+	
+	File* file = new File("log/bazaarbot_purchases.log");
+	FileWriter* writer = new FileWriter(file, true); // true for append new lines
+	writer->write(msg.toString());
+	writer->close();
+	delete file;
+	delete writer;
+}
+
 void AuctionManagerImplementation::doInstantBuy(CreatureObject* player, AuctionItem* item) {
 	ManagedReference<SceneObject*> vendor = zoneServer->getObject(item->getVendorID());
 
@@ -626,7 +642,9 @@ void AuctionManagerImplementation::doInstantBuy(CreatureObject* player, AuctionI
 	item->setBidderName(playername);
 	item->clearAuctionWithdraw();
 
-	player->subtractBankCredits(item->getPrice());
+	if (playername != "bazaarbot") {
+		player->subtractBankCredits(item->getPrice());
+	}
 
 	BaseMessage* msg = new BidAuctionResponseMessage(item->getAuctionedItemObjectID(), 0);
 	player->sendMessage(msg);
@@ -743,11 +761,16 @@ void AuctionManagerImplementation::doInstantBuy(CreatureObject* player, AuctionI
 
 		//Send the Mail
 		UnicodeString blankBody;
-		cman->sendMail(sender, sellerSubject, blankBody, sellerName, &sellerBodyVector, &sellerWaypointVector);
-		cman->sendMail(sender, buyerSubject, blankBody, item->getBidderName(), &buyerBodyVector, &buyerWaypointVector);
-
-		if (sellerName == "BazaarBot"){
+		if (sellerName != "BazaarBot") {
+			cman->sendMail(sender, sellerSubject, blankBody, sellerName, &sellerBodyVector, &sellerWaypointVector);
+		} else {
 			bazaarBotLogSale(item->getBidderName(), itemName, item->getPrice());
+		}
+
+		if (playername != "bazaarbot") {
+			cman->sendMail(sender, buyerSubject, blankBody, item->getBidderName(), &buyerBodyVector, &buyerWaypointVector);
+		} else {
+			bazaarBotLogPurchase(sellerName, itemName, item->getPrice());
 		}
 
 
@@ -1899,3 +1922,37 @@ void AuctionManagerImplementation::bazaarBotListItem(CreatureObject* player, Sce
 	item->setPersistent(1);
 }
 
+// BazaarBot Buy Instant Listing
+void AuctionManagerImplementation::bazaarBotBuyItem(CreatureObject* player) {
+	TerminalListVector terminals = auctionMap->getBazaarTerminalData("", "", 0);
+
+	info("Performing BazaarBot purchases on " + String::valueOf(terminals.size()) + " terminals.", true);
+
+	for (int i = 0; i < terminals.size(); ++i) {
+		Reference<TerminalItemList*> items = terminals.get(i);
+		TerminalItemList validItems;
+
+		if (items == NULL)
+			continue;
+
+		for (int j = 0; j < items->size(); ++j) {
+			ManagedReference<AuctionItem*> item = items->get(j);
+
+			if (item == NULL)
+				continue;
+
+			if (!item->isAuction() && !item->isOwner(player)) {
+				validItems.put(item);
+			}
+		}
+
+		int validSize = validItems.size();
+
+		if (validSize > 0) {
+			int randItem = System::random(validSize-1);
+			ManagedReference<AuctionItem*> item = validItems.get(randItem);
+			doInstantBuy(player, item);
+		}
+	}
+
+}

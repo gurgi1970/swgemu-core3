@@ -154,5 +154,10 @@ class AuctionManager extends ManagedService implements Logger {
 	@local
 	public native void bazaarBotLogSale(final string playerName, final string itemName, int price);
 
+	@local
+	public native void bazaarBotBuyItem(CreatureObject player);
+
+	@local
+	public native void bazaarBotLogPurchase(final string playerName, final string itemName, int price);
 }
 

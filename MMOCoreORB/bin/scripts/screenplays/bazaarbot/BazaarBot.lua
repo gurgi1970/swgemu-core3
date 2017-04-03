@@ -12,10 +12,11 @@ includeFile("bazaarbot/table_structures.lua")
 includeFile("bazaarbot/table_furniture.lua")
 includeFile("bazaarbot/table_clothing.lua")
 includeFile("bazaarbot/table_loot.lua")
+includeFile("bazaarbot/table_buy.lua")
 
 BazaarBot = ScreenPlay:new {
 	numberOfActs = 1,
-	BazaarBotID = 281474993952151, -- Make a character named BazaarBot and put its PlayerID number here (/getPlayerID BazaarBot).
+	BazaarBotID = 281474993656793, -- Make a character named BazaarBot and put its PlayerID number here (/getPlayerID BazaarBot).
 	terminalIDs = {3955353}, -- One SNAPSHOT FILE LOADED Bazaar Terminal ObjectID per region/city you want to (randomly) sell items in
 	itemDescription = "", -- Optional message in the description window.
 	listingsInit = 30, -- On first boot after this system is installed, the server will loop this many times through the add functions
@@ -57,6 +58,7 @@ function BazaarBot:start()
 end
 
 function BazaarBot:startEvents()
+	self:buyItems()
 	self:addMoreResources()
 	self:addMoreArmor()
 	self:addMoreMedicine()
@@ -343,6 +345,20 @@ function BazaarBot:addMoreLoot()
 			self:logListing("Loot: " .. lootName .. " (" .. tostring(lootLevel) .. ") Failed")
 		end
 	end
+end
+
+-- Buy items
+function BazaarBot:buyItems()
+	self:checkInventory()
+	local nextTime = BBBuyConfig.freq * 1000 + getRandomNumber(1, 300000)
+	if (hasServerEvent(BBBuyConfig.eventName)) then
+                rescheduleServerEvent(BBBuyConfig.eventName, nextTime)
+        else
+                createServerEvent(nextTime, "BazaarBot", BBBuyConfig.functionName, BBBuyConfig.eventName)
+        end
+
+	local pBazaarBot = getCreatureObject(self.BazaarBotID)
+	bazaarBotBuyItem(pBazaarBot)
 end
 
 
