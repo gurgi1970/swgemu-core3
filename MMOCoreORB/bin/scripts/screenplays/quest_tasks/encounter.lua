@@ -162,6 +162,7 @@ function Encounter:createEncounter(pPlayer)
 		return true
 	end
 
+	printLuaError("Encounter:createEncounter failed to spawn mobiles for task " .. self.taskName .. " (playerID " .. SceneObject(pPlayer):getObjectID() .. "). Player location: " .. SceneObject(pPlayer):getWorldPositionX() .. ", " .. SceneObject(pPlayer):getWorldPositionY() .. " on " .. SceneObject(pPlayer):getZoneName())
 	return false
 end
 
@@ -181,7 +182,7 @@ function Encounter:handleDespawnEvent(pPlayer)
 	end
 
 	for i = 1, #spawnedObjects, 1 do
-		if spawnedObjects[i] ~= nil and AiAgent(spawnedObjects[i]):isInCombat() then
+		if SpawnMobiles.isValidMobile(spawnedObjects[i]) and AiAgent(spawnedObjects[i]):isInCombat() then
 			createEvent(self.encounterDespawnTime, self.taskName, "handleDespawnEvent", pPlayer, "")
 			return
 		end
@@ -196,7 +197,7 @@ function Encounter:handleDespawnEvent(pPlayer)
 	local mobX, mobY
 
 	for i = 1, #spawnedObjects, 1 do
-		if spawnedObjects[i] ~= nil and self.spawnObjectList[i]["runOnDespawn"] then
+		if SpawnMobiles.isValidMobile(spawnedObjects[i]) and self.spawnObjectList[i]["runOnDespawn"] then
 			CreatureObject(spawnedObjects[i]):setPvpStatusBitmask(0)
 			AiAgent(spawnedObjects[i]):setAiTemplate("follow")
 			runAway = true
@@ -229,7 +230,7 @@ function Encounter:handleDespawnEvent(pPlayer)
 	local newZ = getTerrainHeight(pPlayer, newX, newY)
 
 	for i = 1, #spawnedObjects, 1 do
-		if (spawnedObjects[i] ~= nil) then
+		if (SpawnMobiles.isValidMobile(spawnedObjects[i])) then
 			local objectID = SceneObject(spawnedObjects[i]):getObjectID()
 			writeData(objectID .. ":encounterNewX", newX)
 			writeData(objectID .. ":encounterNewY", newY)

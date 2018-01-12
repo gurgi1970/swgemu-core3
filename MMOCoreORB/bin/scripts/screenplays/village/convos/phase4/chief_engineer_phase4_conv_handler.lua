@@ -14,11 +14,13 @@ function villageChiefEngineerPhase4ConvoHandler:getInitialScreen(pPlayer, pNpc, 
 		return convoTemplate:getScreen("intro_quest7")
 	elseif (QuestManager.hasActiveQuest(pPlayer, QuestManager.quests.FS_CRAFTING4_QUEST_06)) then
 		return convoTemplate:getScreen("intro_quest6")
-	elseif (self:isOnQuestOneThroughFive(pPlayer) and not VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)) then
+	elseif (self:isOnQuestOneThroughFive(pPlayer) and not VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer) and not VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer)) then
 		return convoTemplate:getScreen("intro_continue")
+	elseif (self:isOnQuestOneThroughFive(pPlayer) and VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer) and not VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer) and VillageJediManagerCommon.getActiveQuestIdThisPhase(pPlayer) ~= VILLAGE_PHASE4_ENGINEER) then
+		return convoTemplate:getScreen("intro_not_eligible")
 	elseif (self:isOnQuestOneThroughFive(pPlayer)) then
 		return convoTemplate:getScreen("intro_quest1to5")
-	elseif (VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer) or VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)) then
+	elseif (VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer) or VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer) or not VillageJediManagerCommon.isVillageEligible(pPlayer)) then
 		return convoTemplate:getScreen("intro_not_eligible")
 	else
 		return convoTemplate:getScreen("intro")
@@ -120,7 +122,7 @@ function villageChiefEngineerPhase4ConvoHandler:runScreenHandlers(pConvTemplate,
 		end
 		clonedConversation:addOption("@conversation/fs_phase4_chief_engineer:s_5542b04b", "quite_alright")
 	elseif (screenID == "excellent_continue") then
-		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE4_ENGINEER)
 	elseif (screenID == "waypoint_keren") then
 		PlayerObject(pGhost):addWaypoint("naboo", "Keren - Gadget Specialist", "", 1215, 2740, WAYPOINTYELLOW, true, true, WAYPOINTQUESTTASK)
 		FsCrafting4:activateQuest(pPlayer)

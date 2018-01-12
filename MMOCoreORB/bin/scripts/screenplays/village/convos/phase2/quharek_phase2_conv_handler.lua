@@ -24,7 +24,7 @@ function villageQuharekPhase2ConvoHandler:runScreenHandlers(pConvTemplate, pPlay
 	local clonedConversation = LuaConversationScreen(pConvScreen)
 
 	if (screenID == "intro_questcompleted_activecrafter" or screenID == "intro_questcompleted_notactivecrafter" or screenID == "intro_communitycrafting_active") then
-		if (not VillageCommunityCrafting:isOnActiveCrafterList(pPlayer) and not VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)) then
+		if (screenID ~= "intro_questcompleted_notactivecrafter" and not VillageCommunityCrafting:isOnActiveCrafterList(pPlayer) and not VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer) and not VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer) and VillageJediManagerCommon.isVillageEligible(pPlayer)) then
 			if (VillageCommunityCrafting:getCurrentActiveCrafters() >= VillageCommunityCrafting:getMaxCraftersPerPhase()) then
 				clonedConversation:addOption("@conversation/quharek_phase_2:s_955b2ddb", "max_crafters") -- I hear you're looking for crafters.
 			else
@@ -39,7 +39,7 @@ function villageQuharekPhase2ConvoHandler:runScreenHandlers(pConvTemplate, pPlay
 	elseif (screenID == "need_people_to_help") then
 		clonedConversation:setDialogTextDI(VillageCommunityCrafting:getMinimumIngredients())
 	elseif (screenID == "talk_to_qtqc") then
-		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE2_QUHAREK)
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.FS_PHASE_2_CRAFT_DEFENSES_MAIN)
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.FS_PHASE_2_CRAFT_DEFENSES_01)
 		VillageCommunityCrafting:addToActiveCrafterList(pPlayer)

@@ -27,6 +27,8 @@ public:
 		structureObject = structure;
 		playEffect = doEffect;
 		killOccupants = killStuff;
+
+		setCustomTaskQueue("slowQueue");
 	}
 
 	void run() {
@@ -72,12 +74,8 @@ public:
 
 				//Traverse the vector backwards since the size will change as objects are removed.
 				for (int j = childObjects - 1; j >= 0; --j) {
-					ReadLocker rlocker(cellObject->getContainerLock());
-
 					ManagedReference<SceneObject*> obj =
 							cellObject->getContainerObject(j);
-
-					rlocker.release();
 
 					if (obj->isPlayerCreature() || obj->isPet()) {
 						CreatureObject* playerCreature =
@@ -116,6 +114,11 @@ public:
 			if (ghost != NULL && ghost->isPlayerObject()) {
 				PlayerObject* playerObject = cast<PlayerObject*>(ghost.get());
 				playerObject->removeOwnedStructure(structureObject);
+
+				uint64 waypointID = structureObject->getWaypointID();
+
+				if (waypointID != 0)
+					playerObject->removeWaypoint(waypointID, true, true);
 			}
 		}
 

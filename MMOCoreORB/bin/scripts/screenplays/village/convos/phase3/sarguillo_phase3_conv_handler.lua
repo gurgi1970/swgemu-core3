@@ -6,7 +6,7 @@ villageSarguilloPhase3ConvoHandler = conv_handler:new {}
 function villageSarguilloPhase3ConvoHandler:getInitialScreen(pPlayer, pNpc, pConvTemplate)
 	local convoTemplate = LuaConversationTemplate(pConvTemplate)
 
-	if (VillageJediManagerTownship:getCurrentPhase() ~= 3) then
+	if (VillageJediManagerTownship:getCurrentPhase() ~= 3 or not VillageJediManagerCommon.isVillageEligible(pPlayer)) then
 		return convoTemplate:getScreen("intro_not_available")
 	elseif (QuestManager.hasCompletedQuest(pPlayer, QuestManager.quests.FS_CS_QUEST_DONE)) then
 		return convoTemplate:getScreen("intro_not_available")
@@ -60,7 +60,7 @@ function villageSarguilloPhase3ConvoHandler:runScreenHandlers(pConvTemplate, pPl
 			clonedConversation:addOption("@conversation/combat_quest_p3:s_f3864fa4", "work_with_friend")
 		end
 	elseif (screenID == "excellent") then
-		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE3_SARGUILLO)
 		FsCounterStrike:startQuest(pPlayer)
 	elseif (screenID == "here_is_remote") then
 		FsCounterStrike:giveCampRemote(pPlayer)

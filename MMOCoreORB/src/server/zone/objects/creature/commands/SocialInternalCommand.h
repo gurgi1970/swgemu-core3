@@ -8,6 +8,7 @@
 #include "server/zone/managers/creature/PetManager.h"
 #include "server/zone/managers/reaction/ReactionManager.h"
 #include "server/zone/objects/creature/ai/AiAgent.h"
+#include "server/zone/objects/player/sessions/EntertainingSession.h"
 #include "server/chat/ChatManager.h"
 
 class SocialInternalCommand : public QueueCommand {
@@ -44,8 +45,30 @@ public:
 			return GENERALERROR;
 		}
 
+		Reference<CreatureObject*> creo = server->getZoneServer()->getObject(targetid, true).castTo<CreatureObject*>();
+
+		if (creo == NULL)
+			return SUCCESS;
+
+		if (creo->isPlayerCreature()) {
+			String socialType = chatManager->getSocialType(emoteid);
+
+			if (socialType != "applaud" && socialType != "cheer" && socialType != "clap")
+				return SUCCESS;
+
+			if (creo->isEntertaining() && creo->isInRange(creature, 40.0f)) {
+				ManagedReference<EntertainingSession*> session = creo->getActiveSession(SessionFacadeType::ENTERTAINING).castTo<EntertainingSession*>();
+
+				if (session != NULL && session->getApplauseCount() < 100)
+					session->incrementApplauseCount();
+			}
+
+			return SUCCESS;
+		}
+
 		// If target is a pet, enqueue command to handle it
-		Reference<AiAgent*> aiAgent = server->getZoneServer()->getObject(targetid, true).castTo<AiAgent*>();
+		Reference<AiAgent*> aiAgent = creo->asAiAgent();
+
 		if(aiAgent == NULL)
 			return SUCCESS;
 

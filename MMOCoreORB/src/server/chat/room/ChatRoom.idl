@@ -94,7 +94,11 @@ class ChatRoom extends ManagedObject {
 	}
 
 	public native void init(ZoneServer serv, ChatRoom parent, final string roomName);
+
+	@dirty
 	public native void sendTo(CreatureObject player);
+
+	@dirty
 	public native void sendDestroyTo(CreatureObject player);
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -249,7 +253,12 @@ class ChatRoom extends ManagedObject {
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+	@dirty
+	@local
 	public native void broadcastMessage(BaseMessage msg);
+
+	@dirty
+	@local
 	public native void broadcastMessageCheckIgnore(BaseMessage msg, final string senderName );
 
 	@dirty

@@ -150,7 +150,7 @@ void WeaponObjectImplementation::createChildObjects() {
 }
 
 void WeaponObjectImplementation::sendBaselinesTo(SceneObject* player) {
-	info("sending weapon object baselines");
+	debug("sending weapon object baselines");
 
 	BaseMessage* weao3 = new WeaponObjectMessage3(_this.getReferenceUnsafeStaticCast());
 	player->sendMessage(weao3);
@@ -606,8 +606,8 @@ void WeaponObjectImplementation::updateCraftingValues(CraftingValues* values, bo
 	 * attackmindcost
 	 */
 	float value = 0.f;
-	setMinDamage(MAX(values->getCurrentValue("mindamage"), 0));
-	setMaxDamage(MAX(values->getCurrentValue("maxdamage"), 0));
+	setMinDamage(Math::max(values->getCurrentValue("mindamage"), 0.f));
+	setMaxDamage(Math::max(values->getCurrentValue("maxdamage"), 0.f));
 
 	setAttackSpeed(values->getCurrentValue("attackspeed"));
 	setHealthAttackCost((int)values->getCurrentValue("attackhealthcost"));

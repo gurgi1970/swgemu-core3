@@ -35,7 +35,8 @@ void DroidObjectImplementation::fillAttributeList(AttributeListMessage* msg, Cre
 		}
 
 		for (int i = 0; i < modules.size(); i++) {
-			BaseDroidModuleComponent* module = modules.get(i);
+			auto& module = modules.get(i);
+
 			if (module != NULL) {
 				module->fillAttributeList(msg, object);
 			}
@@ -44,16 +45,16 @@ void DroidObjectImplementation::fillAttributeList(AttributeListMessage* msg, Cre
 }
 
 int DroidObjectImplementation::handleObjectMenuSelect(CreatureObject* player, byte selectedID) {
-	PetControlDevice* pcd = getControlDevice().get().castTo<PetControlDevice*>();
+	auto pcd = getControlDevice().get().castTo<PetControlDevice*>();
 
 	if (getLinkedCreature().get() == player) {
 		// Allow modules to handle radials if desired
 		for (int i = 0; i < modules.size(); i++) {
-			BaseDroidModuleComponent* module = modules.get(i);
+			auto& module = modules.get(i);
 			module->handleObjectMenuSelect(player, selectedID, pcd);
 		}
 	} else if (isMerchantBarker()) {
-		BaseDroidModuleComponent* module = getModule("merchant_barker");
+		auto module = getModule("merchant_barker");
 		if (module != NULL)
 			module->handleObjectMenuSelect(player, selectedID, pcd);
 	}
@@ -65,7 +66,7 @@ void DroidObjectImplementation::fillObjectMenuResponse(ObjectMenuResponse* menuR
 	SceneObjectImplementation::fillObjectMenuResponse(menuResponse, player); // PetMenuComponent
 
 	if (isMerchantBarker() && getLinkedCreature().get() != player) {
-		BaseDroidModuleComponent* module = getModule("merchant_barker");
+		auto module = getModule("merchant_barker");
 		if (module != NULL)
 			module->fillObjectMenuResponse(_this.getReferenceUnsafeStaticCast(), menuResponse, player);
 		return;
@@ -76,10 +77,16 @@ void DroidObjectImplementation::fillObjectMenuResponse(ObjectMenuResponse* menuR
 	}
 
 	// Allow modules to add radials
-	PetControlDevice* pcd = getControlDevice().get().castTo<PetControlDevice*>();
-	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
-		module->fillObjectMenuResponse(_this.getReferenceUnsafeStaticCast(), menuResponse, player);
+	auto pcd = getControlDevice().get().castTo<PetControlDevice*>();
+
+	try {
+		for (int i = 0; i < modules.size(); i++) {
+			auto &module = modules.get(i);
+
+			module->fillObjectMenuResponse(_this.getReferenceUnsafeStaticCast(), menuResponse, player);
+		}
+	} catch (Exception& e) {
+		warning("could not fill fill object menu response on the droid modules:" + e.getMessage());
 	}
 }
 
@@ -188,7 +195,7 @@ void DroidObjectImplementation::handleLowPower() {
 
 	// Deactivate all modules
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 		module->deactivate();
 	}
 
@@ -222,7 +229,7 @@ void DroidObjectImplementation::initDroidModules() {
 
 				BaseDroidModuleComponent* module = cast<BaseDroidModuleComponent*>(data->get());
 				if (module != NULL) {
-					modules.add(module);
+					modules.emplace(module);
 				}
 			}
 		}
@@ -250,10 +257,10 @@ void DroidObjectImplementation::initDroidWeapons() {
 
 CraftingStation* DroidObjectImplementation::getCraftingStation(int type) {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 
 		if (module != NULL && module->actsAsCraftingStation()) {
-			DroidCraftingModuleDataComponent* craftingModule = dynamic_cast<DroidCraftingModuleDataComponent*>(module);
+			DroidCraftingModuleDataComponent* craftingModule = dynamic_cast<DroidCraftingModuleDataComponent*>(module.get());
 
 			if (craftingModule != NULL) {
 				CraftingStation* craftingStation = craftingModule->getCraftingStation();
@@ -273,7 +280,7 @@ CraftingStation* DroidObjectImplementation::getCraftingStation(int type) {
 
 String DroidObjectImplementation::getPersonalityBase() {
 	for (int i = 0; i < modules.size(); i++) {
-		DroidPersonalityModuleDataComponent* module = cast<DroidPersonalityModuleDataComponent*>(modules.get(i));
+		auto module = modules.get(i).castTo<DroidPersonalityModuleDataComponent*>();
 
 		if (module != NULL) {
 			return module->getPersonalityBase();
@@ -285,42 +292,42 @@ String DroidObjectImplementation::getPersonalityBase() {
 
 void DroidObjectImplementation::onStore() {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 		module->onStore();
 	}
 }
 
 void DroidObjectImplementation::onCall() {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 		module->onCall();
 	}
 }
 
 void DroidObjectImplementation::loadSkillMods(CreatureObject* player) {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 		module->loadSkillMods(player);
 	}
 }
 
 void DroidObjectImplementation::unloadSkillMods(CreatureObject* player) {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 		module->unloadSkillMods(player);
 	}
 }
 
 void DroidObjectImplementation::handleChat(CreatureObject* speaker, const String& message) {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 		module->handlePetCommand(message, speaker);
 	}
 }
 
-BaseDroidModuleComponent* DroidObjectImplementation::getModule(const String& name) {
+Reference<BaseDroidModuleComponent*> DroidObjectImplementation::getModule(const String& name) {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 
 		if (module->getModuleName() == name) {
 			return module;
@@ -336,7 +343,7 @@ bool DroidObjectImplementation::isAdvancedModel() {
 
 void DroidObjectImplementation::runModulePowerDrain() {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 		int drain = module->getBatteryDrain();
 
 		if (drain > 0)
@@ -346,7 +353,7 @@ void DroidObjectImplementation::runModulePowerDrain() {
 
 bool DroidObjectImplementation::isCombatDroid() {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 
 		if (module->isCombatModule()) {
 			return true;
@@ -362,7 +369,7 @@ bool DroidObjectImplementation::isCombatDroid() {
 
 bool DroidObjectImplementation::isTrapDroid() {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 
 		if (module->getModuleName() == "trap_module") {
 			return true;
@@ -374,7 +381,7 @@ bool DroidObjectImplementation::isTrapDroid() {
 
 bool DroidObjectImplementation::isMerchantBarker() {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 
 		if (module->getModuleName() == "merchant_barker") {
 			return true;
@@ -386,7 +393,7 @@ bool DroidObjectImplementation::isMerchantBarker() {
 
 bool DroidObjectImplementation::hasStorage() {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 
 		if (module->getModuleName() == "item_storage_module") {
 			return true;
@@ -398,7 +405,7 @@ bool DroidObjectImplementation::hasStorage() {
 
 bool DroidObjectImplementation::isMaintenanceDroid() {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 
 		if (module->getModuleName() == "maintenance_module") {
 			return true;
@@ -410,10 +417,10 @@ bool DroidObjectImplementation::isMaintenanceDroid() {
 
 bool DroidObjectImplementation::assignStructure(StructureObject* structure) {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 
 		if (module->getModuleName() == "maintenance_module") {
-			DroidMaintenanceModuleDataComponent* maintModule = dynamic_cast<DroidMaintenanceModuleDataComponent*>(module);
+			DroidMaintenanceModuleDataComponent* maintModule = dynamic_cast<DroidMaintenanceModuleDataComponent*>(module.get());
 
 			if (maintModule != NULL) {
 				return maintModule->assignStructure(structure->getObjectID());
@@ -426,10 +433,10 @@ bool DroidObjectImplementation::assignStructure(StructureObject* structure) {
 
 bool DroidObjectImplementation::isStructureAssigned(StructureObject* structure) {
 	for (int i = 0; i < modules.size(); i++) {
-		BaseDroidModuleComponent* module = modules.get(i);
+		auto& module = modules.get(i);
 
 		if (module->getModuleName() == "maintenance_module") {
-			DroidMaintenanceModuleDataComponent* maintModule = dynamic_cast<DroidMaintenanceModuleDataComponent*>(module);
+			DroidMaintenanceModuleDataComponent* maintModule = dynamic_cast<DroidMaintenanceModuleDataComponent*>(module.get());
 
 			if (maintModule != NULL) {
 				return maintModule->isAssignedTo(structure->getObjectID());
@@ -447,12 +454,12 @@ bool DroidObjectImplementation::sendConversationStartTo(SceneObject* player) {
 	if (player != getLinkedCreature().get())
 		return false;
 
-	BaseDroidModuleComponent* m = getModule("personality_chip");
+	auto m = getModule("personality_chip");
 	if (m == NULL) {
 		return false;
 	}
 
-	DroidPersonalityModuleDataComponent* personality = dynamic_cast<DroidPersonalityModuleDataComponent*>(m);
+	DroidPersonalityModuleDataComponent* personality = dynamic_cast<DroidPersonalityModuleDataComponent*>(m.get());
 	if (personality == NULL) {
 		return false;
 	}
@@ -499,7 +506,7 @@ bool DroidObjectImplementation::sendConversationStartTo(SceneObject* player) {
 
 String DroidObjectImplementation::getPersonalityStf() {
 	for (int i = 0; i < modules.size(); i++) {
-		DroidPersonalityModuleDataComponent* module = cast<DroidPersonalityModuleDataComponent*>(modules.get(i));
+		auto module = modules.get(i).castTo<DroidPersonalityModuleDataComponent*>();
 
 		if (module != NULL) {
 			return module->getPersonalityStf();

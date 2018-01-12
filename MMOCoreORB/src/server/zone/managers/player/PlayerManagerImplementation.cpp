@@ -15,6 +15,7 @@
 #include "templates/manager/TemplateManager.h"
 #include "server/zone/managers/object/ObjectManager.h"
 #include "server/zone/managers/faction/FactionManager.h"
+#include "server/zone/managers/frs/FrsManager.h"
 #include "server/db/ServerDatabase.h"
 #include "server/chat/ChatManager.h"
 #include "server/zone/managers/objectcontroller/ObjectController.h"
@@ -99,8 +100,7 @@
 #include "server/zone/objects/creature/ai/DroidObject.h"
 #include "server/zone/objects/tangible/components/droid/DroidPlaybackModuleDataComponent.h"
 #include "server/zone/objects/player/badges/Badge.h"
-
-int PlayerManagerImplementation::MAX_CHAR_ONLINE_COUNT = 2;
+#include "server/zone/objects/building/TutorialBuildingObject.h"
 
 PlayerManagerImplementation::PlayerManagerImplementation(ZoneServer* zoneServer, ZoneProcessServer* impl) :
 										Logger("PlayerManager") {
@@ -148,6 +148,8 @@ void PlayerManagerImplementation::loadLuaConfig() {
 
 	lua->runFile("scripts/managers/player_manager.lua");
 
+	allowSameAccountPvpRatingCredit = lua->getGlobalInt("allowSameAccountPvpRatingCredit");
+	onlineCharactersPerAccount = lua->getGlobalInt("onlineCharactersPerAccount");
 	performanceBuff = lua->getGlobalInt("performanceBuff");
 	medicalBuff = lua->getGlobalInt("medicalBuff");
 	performanceDuration = lua->getGlobalInt("performanceDuration");
@@ -386,6 +388,9 @@ bool PlayerManagerImplementation::existsName(const String& name) {
 	return res;
 }
 
+bool PlayerManagerImplementation::existsPlayerCreatureOID(uint64 oid) {
+	return nameMap->containsOID(oid);
+}
 
 bool PlayerManagerImplementation::kickUser(const String& name, const String& admin, String& reason, bool doBan) {
 	ManagedReference<ChatManager*> chatManager = server->getChatManager();
@@ -560,14 +565,23 @@ bool PlayerManagerImplementation::checkPlayerName(ClientCreateCharacterCallback*
 void PlayerManagerImplementation::createTutorialBuilding(CreatureObject* player) {
 	Zone* zone = server->getZone("tutorial");
 
-//	const static String cell = "object/cell/cell.iff";
+	if (zone == NULL) {
+		error("Character creation failed, tutorial zone disabled.");
+		return;
+	}
 
-	Reference<BuildingObject*> tutorial = server->createObject(STRING_HASHCODE("object/building/general/newbie_hall.iff"), 1).castTo<BuildingObject*>();
+	Reference<TutorialBuildingObject*> tutorial = server->createObject(STRING_HASHCODE("object/building/general/newbie_hall.iff"), 1).castTo<TutorialBuildingObject*>();
+
+	if (tutorial == NULL) {
+		error("Tutorial building creation failed.");
+		return;
+	}
 
 	Locker locker(tutorial);
 
 	tutorial->createCellObjects();
 	tutorial->setPublicStructure(true);
+	tutorial->setTutorialOwnerID(player->getObjectID());
 
 	tutorial->initializePosition(System::random(5000), 0, System::random(5000));
 	zone->transferObject(tutorial, -1, true);
@@ -590,6 +604,12 @@ void PlayerManagerImplementation::createTutorialBuilding(CreatureObject* player)
 
 void PlayerManagerImplementation::createSkippedTutorialBuilding(CreatureObject* player) {
 	Zone* zone = server->getZone("tutorial");
+
+	if (zone == NULL) {
+		error("Character creation failed, tutorial zone disabled.");
+		return;
+	}
+
 
 	Reference<BuildingObject*> tutorial = server->createObject(STRING_HASHCODE("object/building/general/newbie_hall_skipped.iff"), 1).castTo<BuildingObject*>();
 
@@ -630,7 +650,7 @@ uint8 PlayerManagerImplementation::calculateIncapacitationTimer(CreatureObject* 
 	uint32 recoveryTime = (value / 5); //In seconds - 3 seconds is recoveryEvent timer
 
 	//Recovery time is gated between 10 and 60 seconds.
-	recoveryTime = MIN(MAX(recoveryTime, 10), 60);
+	recoveryTime = Math::min(Math::max(recoveryTime, 10u), 60u);
 
 	//Check for incap recovery food buff - overrides recovery time gate.
 	/*if (hasBuff(BuffCRC::FOOD_INCAP_RECOVERY)) {
@@ -730,25 +750,6 @@ int PlayerManagerImplementation::notifyDestruction(TangibleObject* destructor, T
 void PlayerManagerImplementation::killPlayer(TangibleObject* attacker, CreatureObject* player, int typeofdeath, bool isCombatAction) {
 	StringIdChatParameter stringId;
 
-	ThreatMap* threatMap = player->getThreatMap();
-
-	if (attacker->isPlayerCreature()) {
-		ManagedReference<CreatureObject*> playerRef = player->asCreatureObject();
-
-		stringId.setStringId("base_player", "prose_target_dead");
-		stringId.setTT(player->getDisplayedName());
-		playerRef->sendSystemMessage(stringId);
-
-		Reference<ThreatMap*> copyThreatMap = new ThreatMap(*threatMap);
-
-		Core::getTaskManager()->executeTask([=] () {
-			if (playerRef != NULL) {
-				Locker locker(playerRef);
-				doPvpDeathRatingUpdate(playerRef, copyThreatMap);
-			}
-		}, "PvpDeathRatingUpdateLambda");
-	}
-
 	if (player->isRidingMount()) {
 		player->updateCooldownTimer("mount_dismount", 0);
 		player->executeObjectControllerAction(STRING_HASHCODE("dismount"));
@@ -765,12 +766,17 @@ void PlayerManagerImplementation::killPlayer(TangibleObject* attacker, CreatureO
 	player->sendSystemMessage(stringId);
 
 	player->updateTimeOfDeath();
-	player->clearBuffs(true);
+	player->clearBuffs(true, false);
 
 	PlayerObject* ghost = player->getPlayerObject();
 
-	if (ghost != NULL)
+	if (ghost != NULL) {
 		ghost->resetIncapacitationTimes();
+		if(ghost->hasPvpTef()) {
+			ghost->schedulePvpTefRemovalTask(true, true);
+		}
+	}
+
 
 	if (attacker->getFaction() != 0) {
 		if (attacker->isPlayerCreature() || attacker->isPet()) {
@@ -793,6 +799,25 @@ void PlayerManagerImplementation::killPlayer(TangibleObject* attacker, CreatureO
 	}
 
 	CombatManager::instance()->freeDuelList(player, false);
+
+	ThreatMap* threatMap = player->getThreatMap();
+
+	if (attacker->isPlayerCreature()) {
+		ManagedReference<CreatureObject*> playerRef = player->asCreatureObject();
+
+		stringId.setStringId("base_player", "prose_target_dead");
+		stringId.setTT(player->getDisplayedName());
+		playerRef->sendSystemMessage(stringId);
+
+		Reference<ThreatMap*> copyThreatMap = new ThreatMap(*threatMap);
+
+		Core::getTaskManager()->executeTask([=] () {
+			if (playerRef != NULL) {
+				Locker locker(playerRef);
+				doPvpDeathRatingUpdate(playerRef, copyThreatMap);
+			}
+		}, "PvpDeathRatingUpdateLambda");
+	}
 
 	threatMap->removeAll(true);
 
@@ -837,37 +862,28 @@ void PlayerManagerImplementation::sendActivateCloneRequest(CreatureObject* playe
 	}
 
 	SortedVector<ManagedReference<SceneObject*> > locations = zone->getPlanetaryObjectList("cloningfacility");
+
 	ManagedReference<SceneObject*> closestCloning = zone->getNearestPlanetaryObject(player, "cloningfacility");
 	if(closestCloning == NULL){
 		warning("nearest cloning facility for player is NULL");
 		return;
 	}
 	String closestName = "None";
-	ManagedReference<CityRegion*> cr = closestCloning->getCityRegion().get();
-	unsigned long long playerID = player->getObjectID();
-	CloningBuildingObjectTemplate* cbot = cast<CloningBuildingObjectTemplate*>(closestCloning->getObjectTemplate());
 
 	//Check if player is city banned where the closest facility is or if it's not a valid cloner
-	if ((cr != NULL && cr->isBanned(playerID)) || cbot == NULL || (cbot->getFaction() != 0 && cbot->getFaction() != player->getFaction())) {
+	if (!isValidClosestCloner(player, closestCloning)) {
 		int distance = 50000;
 		for (int j = 0; j < locations.size(); j++) {
 			ManagedReference<SceneObject*> location = locations.get(j);
 
-			if (location == NULL)
+			if (!isValidClosestCloner(player, location))
 				continue;
 
-			cbot = cast<CloningBuildingObjectTemplate*>(location->getObjectTemplate());
+			ManagedReference<CityRegion*> cr = location->getCityRegion().get();
 
-			if (cbot == NULL || (cbot->getFaction() != 0 && cbot->getFaction() != player->getFaction()))
-				continue;
-
-			cr = location->getCityRegion().get();
-			String name;
+			String name = "";
 
 			if (cr != NULL) {
-				if (cr->isBanned(playerID))
-					continue;
-
 				name = cr->getRegionDisplayedName();
 			} else {
 				name = location->getDisplayedName();
@@ -881,6 +897,8 @@ void PlayerManagerImplementation::sendActivateCloneRequest(CreatureObject* playe
 		}
 
 	} else {
+		ManagedReference<CityRegion*> cr = closestCloning->getCityRegion().get();
+
 		if (cr != NULL)
 			closestName = cr->getRegionDisplayedName();
 		else
@@ -901,8 +919,59 @@ void PlayerManagerImplementation::sendActivateCloneRequest(CreatureObject* playe
 	if (preDesignatedFacility != NULL && preDesignatedFacility->getZone() == zone)
 		cloneMenu->addMenuItem("@base_player:revive_bind", preDesignatedFacility->getObjectID());
 
+	for (int i = 0; i < locations.size(); i++) {
+		ManagedReference<SceneObject*> loc = locations.get(i);
+
+		if (loc == NULL)
+			continue;
+
+		CloningBuildingObjectTemplate* cbot = cast<CloningBuildingObjectTemplate*>(loc->getObjectTemplate());
+
+		if (cbot == NULL)
+			continue;
+
+		if (cbot->getFacilityType() == CloningBuildingObjectTemplate::JEDI_ONLY && player->hasSkill("force_title_jedi_rank_01")) {
+			String name = "Force Shrine (" + String::valueOf((int)loc->getWorldPositionX()) + ", " + String::valueOf((int)loc->getWorldPositionY()) + ")";
+			cloneMenu->addMenuItem(name, loc->getObjectID());
+		} else if ((cbot->getFacilityType() == CloningBuildingObjectTemplate::LIGHT_JEDI_ONLY && player->hasSkill("force_rank_light_novice")) ||
+				(cbot->getFacilityType() == CloningBuildingObjectTemplate::DARK_JEDI_ONLY && player->hasSkill("force_rank_dark_novice"))) {
+			FrsManager* frsManager = server->getFrsManager();
+
+			if (frsManager->isFrsEnabled()) {
+				String name = "Jedi Enclave (" + String::valueOf((int)loc->getWorldPositionX()) + ", " + String::valueOf((int)loc->getWorldPositionY()) + ")";
+				cloneMenu->addMenuItem(name, loc->getObjectID());
+			}
+		}
+	}
+
 	ghost->addSuiBox(cloneMenu);
 	player->sendMessage(cloneMenu->generateMessage());
+}
+
+bool PlayerManagerImplementation::isValidClosestCloner(CreatureObject* player, SceneObject* cloner) {
+	if (cloner == NULL)
+		return false;
+
+	ManagedReference<CityRegion*> cr = cloner->getCityRegion().get();
+
+	if (cr != NULL && cr->isBanned(player->getObjectID()))
+		return false;
+
+	CloningBuildingObjectTemplate* cbot = cast<CloningBuildingObjectTemplate*>(cloner->getObjectTemplate());
+
+	if (cbot == NULL)
+		return false;
+
+	if (cbot->getFacilityType() == CloningBuildingObjectTemplate::FACTION_IMPERIAL && player->getFaction() != Factions::FACTIONIMPERIAL)
+		return false;
+
+	if (cbot->getFacilityType() == CloningBuildingObjectTemplate::FACTION_REBEL && player->getFaction() != Factions::FACTIONREBEL)
+		return false;
+
+	if (cbot->isJediCloner())
+		return false;
+
+	return true;
 }
 
 void PlayerManagerImplementation::sendPlayerToCloner(CreatureObject* player, uint64 clonerID, int typeofdeath) {
@@ -928,13 +997,6 @@ void PlayerManagerImplementation::sendPlayerToCloner(CreatureObject* player, uin
 		return;
 	}
 
-	BuildingObject* cloningBuilding = cloner.castTo<BuildingObject*>();
-
-	if (cloningBuilding == NULL)  {
-		error("Cloning building is null");
-		return;
-	}
-
 	CloneSpawnPoint* clonePoint = cbot->getRandomSpawnPoint();
 
 	if (clonePoint == NULL) {
@@ -946,36 +1008,45 @@ void PlayerManagerImplementation::sendPlayerToCloner(CreatureObject* player, uin
 	Quaternion* direction = clonePoint->getDirection();
 
 	int cellID = clonePoint->getCellID();
+	SceneObject* cell = NULL;
 
-	SceneObject* cell = cloningBuilding->getCell(cellID);
+	if (cellID != 0) {
+		BuildingObject* cloningBuilding = cloner.castTo<BuildingObject*>();
 
-	if (cell == NULL) {
-		StringBuffer msg;
-		msg << "null cell for cellID " << cellID << " in building: " << cbot->getFullTemplateString();
-		error(msg.toString());
-		return;
+		if (cloningBuilding == NULL)  {
+			error("Cloning building is null");
+			return;
+		}
+
+		cell = cloningBuilding->getCell(cellID);
+
+		if (cell == NULL) {
+			StringBuffer msg;
+			msg << "null cell for cellID " << cellID << " in building: " << cbot->getFullTemplateString();
+			error(msg.toString());
+			return;
+		}
 	}
 
 	Zone* zone = player->getZone();
 
-	player->switchZone(zone->getZoneName(), coordinate->getPositionX(), coordinate->getPositionZ(), coordinate->getPositionY(), cell->getObjectID());
+	if (cellID == 0)
+		player->switchZone(zone->getZoneName(), cloner->getWorldPositionX() + coordinate->getPositionX(), cloner->getWorldPositionZ() + coordinate->getPositionZ(), cloner->getWorldPositionY() + coordinate->getPositionY(), 0);
+	else
+		player->switchZone(zone->getZoneName(), coordinate->getPositionX(), coordinate->getPositionZ(), coordinate->getPositionY(), cell->getObjectID());
 
 	uint64 preDesignatedFacilityOid = ghost->getCloningFacility();
 	ManagedReference<SceneObject*> preDesignatedFacility = server->getObject(preDesignatedFacilityOid);
 
-	if (preDesignatedFacility == NULL || preDesignatedFacility != cloningBuilding) {
+	if (preDesignatedFacility == NULL || preDesignatedFacility != cloner) {
 		player->addWounds(CreatureAttribute::HEALTH, 100, true, false);
 		player->addWounds(CreatureAttribute::ACTION, 100, true, false);
 		player->addWounds(CreatureAttribute::MIND, 100, true, false);
 		player->addShockWounds(100, true);
 	}
 
-	if (player->getFactionStatus() != FactionStatus::ONLEAVE && cbot->getFaction() == 0)
+	if (player->getFactionStatus() != FactionStatus::ONLEAVE && cbot->getFacilityType() != CloningBuildingObjectTemplate::FACTION_IMPERIAL && cbot->getFacilityType() != CloningBuildingObjectTemplate::FACTION_REBEL && !player->hasSkill("force_title_jedi_rank_03"))
 		player->setFactionStatus(FactionStatus::ONLEAVE);
-
-	if (ghost->hasPvpTef())
-		ghost->schedulePvpTefRemovalTask(true);
-
 
 	SortedVector<ManagedReference<SceneObject*> > insurableItems = getInsurableItems(player, false);
 
@@ -1078,7 +1149,7 @@ void PlayerManagerImplementation::ejectPlayerFromBuilding(CreatureObject* player
 
 
 void PlayerManagerImplementation::disseminateExperience(TangibleObject* destructedObject, ThreatMap* threatMap,
-		SynchronizedVector<ManagedReference<CreatureObject*> >* spawnedCreatures) {
+		SynchronizedVector<ManagedReference<CreatureObject*> >* spawnedCreatures,Zone* lairZone) {
 	uint32 totalDamage = threatMap->getTotalDamage();
 
 	if (totalDamage == 0) {
@@ -1094,9 +1165,10 @@ void PlayerManagerImplementation::disseminateExperience(TangibleObject* destruct
 	float gcwBonus = 1.0f;
 	uint32 winningFaction = -1;
 	int baseXp = 0;
-
-	Zone* zone = destructedObject->getZone();
-
+	Zone* zone = lairZone;
+	if (zone==NULL){
+		zone = destructedObject->getZone();
+	}
 	if (zone != NULL) {
 		GCWManager* gcwMan = zone->getGCWManager();
 
@@ -1183,7 +1255,7 @@ void PlayerManagerImplementation::disseminateExperience(TangibleObject* destruct
 			if (levelRatio <= 0.5) {
 				xpAmount = 1;
 			} else {
-				xpAmount = MIN(xpAmount, (float)attacker->getLevel() * 50.f);
+				xpAmount = Math::min(xpAmount, (float)attacker->getLevel() * 50.f);
 				xpAmount /= totalPets;
 
 				if (winningFaction == attacker->getFaction())
@@ -1193,9 +1265,9 @@ void PlayerManagerImplementation::disseminateExperience(TangibleObject* destruct
 			awardExperience(owner, "creaturehandler", xpAmount);
 
 		} else if (attacker->isPlayerCreature()) {
-			if (!destructedObject->isInRange(attacker, 80))
+			if (!(attacker->getZone() == zone && destructedObject->isInRangeZoneless(attacker, 80))){
 				continue;
-
+			}
 			ManagedReference<GroupObject*> group = attacker->getGroup();
 
 			uint32 combatXp = 0;
@@ -1210,7 +1282,7 @@ void PlayerManagerImplementation::disseminateExperience(TangibleObject* destruct
 				xpAmount *= (float) damage / totalDamage;
 
 				//Cap xp based on level
-				xpAmount = MIN(xpAmount, calculatePlayerLevel(attacker, xpType) * 300.f);
+				xpAmount = Math::min(xpAmount, calculatePlayerLevel(attacker, xpType) * 300.f);
 
 				//Apply group bonus if in group
 				if (group != NULL)
@@ -1345,9 +1417,9 @@ bool PlayerManagerImplementation::checkEncumbrancies(CreatureObject* player, Arm
 }
 
 void PlayerManagerImplementation::applyEncumbrancies(CreatureObject* player, ArmorObject* armor) {
-	int healthEncumb = MAX(0, armor->getHealthEncumbrance());
-	int actionEncumb = MAX(0, armor->getActionEncumbrance());
-	int mindEncumb = MAX(0, armor->getMindEncumbrance());
+	int healthEncumb = Math::max(0, armor->getHealthEncumbrance());
+	int actionEncumb = Math::max(0, armor->getActionEncumbrance());
+	int mindEncumb = Math::max(0, armor->getMindEncumbrance());
 
 	player->addEncumbrance(CreatureEncumbrance::HEALTH, healthEncumb, true);
 	player->addEncumbrance(CreatureEncumbrance::ACTION, actionEncumb, true);
@@ -1373,9 +1445,9 @@ void PlayerManagerImplementation::applyEncumbrancies(CreatureObject* player, Arm
 }
 
 void PlayerManagerImplementation::removeEncumbrancies(CreatureObject* player, ArmorObject* armor) {
-	int healthEncumb = MAX(0, armor->getHealthEncumbrance());
-	int actionEncumb = MAX(0, armor->getActionEncumbrance());
-	int mindEncumb = MAX(0, armor->getMindEncumbrance());
+	int healthEncumb = Math::max(0, armor->getHealthEncumbrance());
+	int actionEncumb = Math::max(0, armor->getActionEncumbrance());
+	int mindEncumb = Math::max(0, armor->getMindEncumbrance());
 
 	player->addEncumbrance(CreatureEncumbrance::HEALTH, -healthEncumb, true);
 	player->addEncumbrance(CreatureEncumbrance::ACTION, -actionEncumb, true);
@@ -1496,7 +1568,7 @@ void PlayerManagerImplementation::setExperienceMultiplier(float globalMultiplier
  *
  */
 int PlayerManagerImplementation::awardExperience(CreatureObject* player, const String& xpType,
-		int amount, bool sendSystemMessage, float localMultiplier) {
+		int amount, bool sendSystemMessage, float localMultiplier, bool applyModifiers) {
 
 	PlayerObject* playerObject = player->getPlayerObject();
 
@@ -1508,7 +1580,12 @@ int PlayerManagerImplementation::awardExperience(CreatureObject* player, const S
 	if (amount > 0)
 		speciesModifier = getSpeciesXpModifier(player->getSpeciesName(), xpType);
 
-	int xp = playerObject->addExperience(xpType, (int) (amount * speciesModifier * localMultiplier * globalExpMultiplier));
+	int xp = 0;
+
+	if (applyModifiers)
+		xp = playerObject->addExperience(xpType, (int) (amount * speciesModifier * localMultiplier * globalExpMultiplier));
+	else
+		xp = playerObject->addExperience(xpType, (int)amount);
 
 	player->notifyObservers(ObserverEventType::XPAWARDED, player, xp);
 
@@ -2077,9 +2154,17 @@ int PlayerManagerImplementation::notifyObserverEvent(uint32 eventType, Observabl
 }
 
 void PlayerManagerImplementation::sendBattleFatigueMessage(CreatureObject* player, CreatureObject* target) {
-	if (target->isPlayerCreature()) {
-		uint32 targetBattleFatigue = target->getShockWounds();
+	uint32 targetBattleFatigue = target->getShockWounds();
 
+	if (player == target) {
+		if (targetBattleFatigue >= 250 && targetBattleFatigue < 500) {
+			player->sendSystemMessage("@healing:shock_effect_low");
+		} else if (targetBattleFatigue >= 500 && targetBattleFatigue < 750) {
+			player->sendSystemMessage("@healing:shock_effect_medium");
+		} else if (targetBattleFatigue >= 750) {
+			player->sendSystemMessage("@healing:shock_effect_high");
+		}
+	} else if (target->isPlayerCreature()) {
 		if (targetBattleFatigue >= 250 && targetBattleFatigue < 500) {
 			target->sendSystemMessage("@healing:shock_effect_low_target");
 		} else if (targetBattleFatigue >= 500 && targetBattleFatigue < 750) {
@@ -2087,16 +2172,6 @@ void PlayerManagerImplementation::sendBattleFatigueMessage(CreatureObject* playe
 		} else if (targetBattleFatigue >= 750) {
 			target->sendSystemMessage("@healing:shock_effec_high_target");
 		}
-	}
-
-	uint32 playerBattleFatigue = player->getShockWounds();
-
-	if (playerBattleFatigue >= 250 && playerBattleFatigue < 500) {
-		player->sendSystemMessage("@healing:shock_effect_low");
-	} else if (playerBattleFatigue >= 500 && playerBattleFatigue < 750) {
-		player->sendSystemMessage("@healing:shock_effect_medium");
-	} else if (playerBattleFatigue >= 750) {
-		player->sendSystemMessage("@healing:shock_effect_high");
 	}
 }
 
@@ -2455,9 +2530,9 @@ void PlayerManagerImplementation::startListen(CreatureObject* creature, uint64 e
 			creature->sendSystemMessage("@performance:music_listen_npc"); // "You cannot /listen to NPCs."
 			return;
 		}
-		BaseDroidModuleComponent* bmodule = droid->getModule("playback_module");
+		auto bmodule = droid->getModule("playback_module");
 		if(bmodule != NULL) {
-			DroidPlaybackModuleDataComponent* module = cast<DroidPlaybackModuleDataComponent*>(bmodule);
+			DroidPlaybackModuleDataComponent* module = cast<DroidPlaybackModuleDataComponent*>(bmodule.get());
 			if(module != NULL) {
 				if (creature->isDancing() || creature->isPlayingMusic()) {
 					StringIdChatParameter stringID;
@@ -2604,7 +2679,7 @@ SceneObject* PlayerManagerImplementation::getInRangeStructureWithAdminRights(Cre
 
 	CloseObjectsVector* closeObjs = (CloseObjectsVector*)creature->getCloseObjects();
 	SortedVector<QuadTreeEntry*> closeObjects;
-	closeObjs->safeCopyTo(closeObjects);
+	closeObjs->safeCopyReceiversTo(closeObjects, CloseObjectsVector::STRUCTURETYPE);
 
 	for (int i = 0; i < closeObjects.size(); ++i) {
 		ManagedReference<SceneObject*> tObj = cast<SceneObject*>( closeObjects.get(i));
@@ -2711,6 +2786,9 @@ void PlayerManagerImplementation::updatePermissionLevel(CreatureObject* targetPl
 
 void PlayerManagerImplementation::updatePermissionName(CreatureObject* player, int permissionLevel) {
 	ManagedReference<PlayerObject*> ghost = player->getPlayerObject();
+	int priviledgeFlag = permissionLevelList->getPriviledgeFlag(permissionLevel);
+
+	ghost->setPriviledgeFlag(priviledgeFlag);
 	//Send deltas
 	if (player->isOnline()) {
 		UnicodeString tag = permissionLevelList->getPermissionTag(permissionLevel);
@@ -2719,6 +2797,8 @@ void PlayerManagerImplementation::updatePermissionName(CreatureObject* player, i
 		tanod3->updateCustomName(player->getDisplayedName(), tag);
 		tanod3->close();
 		player->broadcastMessage(tanod3, true);
+
+		ghost->updateInRangeBuildingPermissions();
 
 		/*PlayerObjectDeltaMessage6* playd6 = new PlayerObjectDeltaMessage6(ghost);
 			playd6->setAdminLevel(adminLevel);
@@ -2733,21 +2813,21 @@ void PlayerManagerImplementation::updateSwimmingState(CreatureObject* player, fl
 		return;
 	}
 
-	ManagedReference<Zone*> zone = player->getZone();
+	Zone* zone = player->getZone();
 
 	if (zone == NULL) {
 		player->info("No zone.", true);
 		return;
 	}
 
-	ManagedReference<PlanetManager*> planetManager = zone->getPlanetManager();
+	PlanetManager* planetManager = zone->getPlanetManager();
 
 	if (planetManager == NULL) {
 		player->info("No planet manager.", true);
 		return;
 	}
 
-	ManagedReference<TerrainManager*> terrainManager = planetManager->getTerrainManager();
+	TerrainManager* terrainManager = planetManager->getTerrainManager();
 
 	if (terrainManager == NULL) {
 		player->info("No terrain manager.", true);
@@ -3126,7 +3206,7 @@ int PlayerManagerImplementation::calculatePlayerLevel(CreatureObject* player) {
 	if (player->getPlayerObject() != NULL && player->getPlayerObject()->isJedi() && weapon->isJediWeapon())
 		skillMod += player->getSkillMod("private_jedi_difficulty");
 
-	int level = MIN(25, skillMod / 100 + 1);
+	int level = Math::min(25, skillMod / 100 + 1);
 
 	return level;
 }
@@ -3153,7 +3233,7 @@ int PlayerManagerImplementation::calculatePlayerLevel(CreatureObject* player, St
 	else
 		weaponType = "heavyweapon";
 
-	int level = MIN(25, player->getSkillMod("private_" + weaponType + "_combat_difficulty") / 100 + 1);
+	int level = Math::min(25, player->getSkillMod("private_" + weaponType + "_combat_difficulty") / 100 + 1);
 
 	return level;
 }
@@ -4384,6 +4464,13 @@ void PlayerManagerImplementation::confirmVeteranReward(CreatureObject* player, i
 	}
 
 	VeteranReward reward = veteranRewards.get(itemIndex);
+
+	if (playerGhost->hasChosenVeteranReward(reward.getTemplateFile())) {
+		player->sendSystemMessage( "@veteran:reward_error"); //	The reward could not be granted.
+		cancelVeteranRewardSession(player);
+		return;
+	}
+
 	rewardSession->setSelectedRewardIndex(itemIndex);
 
 	// Generate confirmation dialog if item is one-time.  Otherwise, just generate it.
@@ -4470,7 +4557,9 @@ void PlayerManagerImplementation::generateVeteranReward(CreatureObject* player )
 	player->sendSystemMessage( "@veteran:reward_given");  // Your reward has been placed in your inventory.
 
 	// Record reward in all characters registered to the account
-	playerGhost->addChosenVeteranReward(rewardSession->getMilestone(), reward.getTemplateFile());
+	GalaxyAccountInfo* accountInfo = account->getGalaxyAccountInfo(player->getZoneServer()->getGalaxyName());
+
+	accountInfo->addChosenVeteranReward(rewardSession->getMilestone(), reward.getTemplateFile());
 
 
 	cancelVeteranRewardSession( player );
@@ -4584,7 +4673,7 @@ bool PlayerManagerImplementation::increaseOnlineCharCountIfPossible(ZoneClientSe
 		}
 	}
 
-	if (onlineCount >= MAX_CHAR_ONLINE_COUNT)
+	if (onlineCount >= onlineCharactersPerAccount)
 		return false;
 
 	clients.add(client);
@@ -4635,8 +4724,6 @@ void PlayerManagerImplementation::disconnectAllPlayers() {
 			}
 		}
 	}
-
-	info("All players disconnected", true);
 }
 
 bool PlayerManagerImplementation::shouldRescheduleCorpseDestruction(CreatureObject* player, CreatureObject* ai) {
@@ -5156,6 +5243,8 @@ void PlayerManagerImplementation::doPvpDeathRatingUpdate(CreatureObject* player,
 	int victimRatingTotalDelta = 0;
 	ManagedReference<CreatureObject*> highDamageAttacker = NULL;
 	uint32 highDamageAmount = 0;
+	FrsManager* frsManager = server->getFrsManager();
+	int frsXpAdjustment = 0;
 
 	for (int i = 0; i < threatMap->size(); ++i) {
 		ThreatMapEntry* entry = &threatMap->elementAt(i).getValue();
@@ -5164,12 +5253,21 @@ void PlayerManagerImplementation::doPvpDeathRatingUpdate(CreatureObject* player,
 		if (entry == NULL || attacker == NULL || attacker == player || !attacker->isPlayerCreature())
 			continue;
 
-		if (player->getDistanceTo(attacker) > 80.f)
+		if (!player->isAttackableBy(attacker, true))
 			continue;
 
 		PlayerObject* attackerGhost = attacker->getPlayerObject();
 
 		if (attackerGhost == NULL)
+			continue;
+
+		if (!allowSameAccountPvpRatingCredit && ghost->getAccountID() == attackerGhost->getAccountID())
+			continue;
+
+		if (entry->getTotalDamage() <= 0)
+			continue;
+
+		if (player->getDistanceTo(attacker) > 80.f)
 			continue;
 
 		int curAttackerRating = attackerGhost->getPvpRating();
@@ -5197,8 +5295,6 @@ void PlayerManagerImplementation::doPvpDeathRatingUpdate(CreatureObject* player,
 			continue;
 		}
 
-		ghost->addToKillerList(attacker->getObjectID());
-
 		if (defenderPvpRating <= PlayerObject::PVP_RATING_FLOOR) {
 			String stringFile;
 			if (attacker->getSpecies() == CreatureObject::TRANDOSHAN)
@@ -5217,6 +5313,23 @@ void PlayerManagerImplementation::doPvpDeathRatingUpdate(CreatureObject* player,
 		}
 
 		float damageContribution = (float) entry->getTotalDamage() / totalDamage;
+
+		if (frsManager != NULL && frsManager->isFrsEnabled() && frsManager->isValidFrsBattle(attacker, player)) {
+			int attackerFrsXp = frsManager->calculatePvpExperienceChange(attacker, player, damageContribution, false);
+			int victimFrsXp = frsManager->calculatePvpExperienceChange(attacker, player, damageContribution, true);
+			frsXpAdjustment += victimFrsXp;
+
+			ManagedReference<CreatureObject*> attackerRef = attacker;
+			if (attackerFrsXp > 0) {
+				Core::getTaskManager()->executeTask([attackerRef, frsManager, attackerFrsXp] () {
+					Locker locker(attackerRef);
+					Locker clocker(frsManager, attackerRef);
+					frsManager->adjustFrsExperience(attackerRef, attackerFrsXp);
+				}, "FrsExperienceAdjustLambda");
+			}
+		}
+
+		ghost->addToKillerList(attacker->getObjectID());
 
 		int attackerRatingDelta = 20 + ((curAttackerRating - defenderPvpRating) / 25);
 		int victimRatingDelta = -20 + ((defenderPvpRating - curAttackerRating) / 25);
@@ -5261,6 +5374,12 @@ void PlayerManagerImplementation::doPvpDeathRatingUpdate(CreatureObject* player,
 
 	if (highDamageAttacker == NULL)
 		return;
+
+	if (frsManager != NULL && frsManager->isFrsEnabled() && frsXpAdjustment < 0) {
+		Locker crossLock(frsManager, player);
+
+		frsManager->adjustFrsExperience(player, frsXpAdjustment);
+	}
 
 	if (defenderPvpRating <= PlayerObject::PVP_RATING_FLOOR) {
 		String stringFile;

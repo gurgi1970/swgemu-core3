@@ -9,7 +9,7 @@ FsSad1Theater1 = GoToTheater:new {
 	taskName = "FsSad1Theater1",
 	-- GoToTheater properties
 	minimumDistance = 800,
-	maximumDistance = 1200,
+	maximumDistance = 2000,
 	theater = {
 		{ template = "object/static/structure/corellia/corl_tent_small.iff", xDiff = 1.438, zDiff = 0.392, yDiff = 1.875, heading = 0 },
 		{ template = "object/static/structure/general/all_banner_generic_s01.iff", xDiff = -2.133, zDiff = -1.061, yDiff = -1.731, heading = 0 },
@@ -26,8 +26,8 @@ FsSad1Theater1 = GoToTheater:new {
 		{ template = "sith_shadow_outlaw", minimumDistance = 7, maximumDistance = 12, referencePoint = 0 }
 	},
 	createWaypoint = false,
-	despawnTime = 20 * 60 * 1000, -- 20 minutes
 	activeAreaRadius = 16,
+	flattenLayer = true
 }
 
 function FsSad1Theater1:onObjectsSpawned(pPlayer, spawnedMobileList)

@@ -19,6 +19,8 @@
 #include "engine/util/u3d/Segment.h"
 #include "pathfinding/recast/DetourCommon.h"
 
+static constexpr int MAX_QUERY_NODES = 2048 * 2;
+
 void destroyNavMeshQuery(void* value) {
 	dtFreeNavMeshQuery(reinterpret_cast<dtNavMeshQuery*>(value));
 }
@@ -26,7 +28,7 @@ void destroyNavMeshQuery(void* value) {
 PathFinderManager::PathFinderManager() : Logger("PathFinderManager"), m_navQuery(destroyNavMeshQuery) {
 	setFileLogger("log/pathfinder.log");
 
-	m_filter.setIncludeFlags(SAMPLE_POLYFLAGS_ALL ^ SAMPLE_POLYFLAGS_DISABLED);
+	m_filter.setIncludeFlags(SAMPLE_POLYFLAGS_ALL ^ (SAMPLE_POLYFLAGS_DISABLED));
 	m_filter.setExcludeFlags(0);
 	m_filter.setAreaCost(SAMPLE_POLYAREA_GROUND, 1.0f);
 	m_filter.setAreaCost(SAMPLE_POLYAREA_WATER, 15.0f);
@@ -64,46 +66,47 @@ Vector<WorldCoordinates>* PathFinderManager::findPath(const WorldCoordinates& po
 }
 
 void PathFinderManager::filterPastPoints(Vector<WorldCoordinates>* path, SceneObject* object) {
-    Vector3 thisWorldPosition = object->getWorldPosition();
-    Vector3 thiswP = thisWorldPosition;
-    thiswP.setZ(0);
+	Vector3 thisWorldPosition = object->getWorldPosition();
+	Vector3 thiswP = thisWorldPosition;
+	thiswP.setZ(0);
 
-    if (path->size() > 2 && path->get(0) == path->get(1))
-        path->remove(1);
+	int i = 2;
 
-    for (int i = 2; i < path->size(); ++i) {
-        WorldCoordinates coord1 = path->get(i);
-        WorldCoordinates coord2 = path->get(i - 1);
+	while (i < path->size()) {
+		WorldCoordinates coord1 = path->get(i);
+		WorldCoordinates coord2 = path->get(i - 1);
 
-        Vector3 end = coord1.getWorldPosition();
-        Vector3 start = coord2.getWorldPosition();
+		if (path->size() > 2) {
+			if (coord1 == coord2) {
+				path->remove(i - 1);
+				continue;
+			}
 
-        if (coord1.getCell() != coord2.getCell()) {
-            Vector3 coord1WorldPosition = end;
-            Vector3 coord2WorldPosition = start;
+			Vector3 end = coord1.getWorldPosition();
+			Vector3 start = coord2.getWorldPosition();
 
-            if (coord1WorldPosition == coord2WorldPosition && thisWorldPosition == coord1WorldPosition) {
-                path->remove(i - 1);
-                break;
-            }
+			if (end == start) {
+				path->remove(i - 1);
+				continue;
+			}
 
-            continue;
-        }
+			end.setZ(0);
+			start.setZ(0);
+			Segment sgm(start, end);
 
-        end.setZ(0);
-        start.setZ(0);
-        Segment sgm(start, end);
+			Vector3 closestP = sgm.getClosestPointTo(thiswP);
 
-        Vector3 closestP = sgm.getClosestPointTo(thiswP);
+			if (closestP.distanceTo(thiswP) <= FLT_EPSILON) {
+				for (int j = i - 1; j > 0; --j) {
+					path->remove(j);
+				}
 
-        if (closestP.distanceTo(thiswP) <= FLT_EPSILON) {
-            for (int j = i - 1; j > 0; --j) {
-                path->remove(j);
-            }
+				continue;
+			}
+		}
 
-            break;
-        }
-    }
+		i++;
+	}
 }
 
 bool pointInSphere(const Vector3 &point, const Sphere& sphere) {
@@ -123,6 +126,7 @@ void PathFinderManager::getNavMeshCollisions(SortedVector<NavCollision*> *collis
 
 		const Vector3& bPos = bounds->center();
 		Vector3 sPos(bPos.getX(), bPos.getZ(), 0);
+		sPos.setZ(CollisionManager::getWorldFloorCollision(sPos.getX(), sPos.getY(), area->getZone(), false));
 		const float radius = bounds->extents()[bounds->longestAxis()] * .975f;
 		float radiusSq = radius*radius;
 
@@ -136,7 +140,7 @@ void PathFinderManager::getNavMeshCollisions(SortedVector<NavCollision*> *collis
 		float t1 = tca - thc;
 		float t2 = tca + thc;
 
-		if (abs(t1 - t2) > 0.1f && t1 > 0 && t1 < maxT)
+		if (fabs(t1 - t2) > 0.1f && t1 > 0 && t1 < maxT)
 			collisions->put(new NavCollision(start + (dir * t1), t1, area));
 
 		if (t2 > 0 && t2 < maxT)
@@ -144,76 +148,103 @@ void PathFinderManager::getNavMeshCollisions(SortedVector<NavCollision*> *collis
 	}
 }
 
+dtNavMeshQuery* PathFinderManager::getNavQuery() {
+	dtNavMeshQuery* query = m_navQuery.get();
+
+	if (query == NULL) {
+		query = dtAllocNavMeshQuery();
+		m_navQuery.set(query);
+	}
+
+	return query;
+}
+
 bool PathFinderManager::getRecastPath(const Vector3& start, const Vector3& end, NavArea* area, Vector<WorldCoordinates>* path, float& len, bool allowPartial) {
 	const Vector3 startPosition(start.getX(), start.getZ(), -start.getY());
 	const Vector3 targetPosition(end.getX(), end.getZ(), -end.getY());
 	const float* startPosAsFloat = startPosition.toFloatArray();
 	const float* tarPosAsFloat = targetPosition.toFloatArray();
-	static float extents[3] = {2, 4, 2};
+	const static float extents[3] = {2, 4, 2};
 	dtPolyRef startPoly;
 	dtPolyRef endPoly;
 
-	Reference<RecastNavMesh*> navMesh = area->getNavMesh();
+	Vector3 areaPos = area->getPosition();
+	Zone* zone = area->getZone();
 
-	if(navMesh == NULL || navMesh->isLoaded() == false)
-		return 0;
+	if (zone == nullptr)
+		return false;
 
-	dtNavMeshQuery *query = m_navQuery.get();
-	if(query == NULL) {
-		query = dtAllocNavMeshQuery();
-		m_navQuery.set(query);
-	}
+	areaPos.setZ(area->getAreaTerrainHeight());
 
-	const Vector3& areaPos = area->getPosition();
+	dtNavMeshQuery* query = getNavQuery();
+
+	ReadLocker rLocker(area);
+
+	RecastNavMesh* navMesh = area->getNavMesh();
+
+	if (navMesh == NULL || !navMesh->isLoaded())
+		return false;
+
 	// We need to flip the Y/Z axis and negate Z to put it in recasts model space
 	const Sphere sphere(Vector3(areaPos.getX(), areaPos.getZ(), -areaPos.getY()), area->getRadius());
 
-	query->init(navMesh->getNavMesh(), 2048);
+	query->init(navMesh->getNavMesh(), MAX_QUERY_NODES);
 
 	if (pointInSphere(targetPosition, sphere) || pointInSphere(startPosition, sphere)) {
-
 		Vector3 polyStart;
 		Vector3 polyEnd;
 		int numPolys;
-		dtPolyRef polyPath[2048];
+		const static constexpr int MAX_POLYS = 2048;
+
+		dtPolyRef polyPath[MAX_POLYS];
 		int status = 0;
 
-		ReadLocker rLocker(navMesh->getLock());
-
-		if (!((status =query->findNearestPoly(startPosAsFloat, extents, &m_filter, &startPoly, polyStart.toFloatArray())) & DT_SUCCESS))
+		if (!((status = query->findNearestPoly(startPosAsFloat, extents, &m_filter, &startPoly, polyStart.toFloatArray())) & DT_SUCCESS))
 			return false;
 
 		if (!((status = query->findNearestPoly(tarPosAsFloat, extents, &m_filter, &endPoly, polyEnd.toFloatArray())) & DT_SUCCESS))
 			return false;
 
-		if (!((status = query->findPath(startPoly, endPoly, polyStart.toFloatArray(), polyEnd.toFloatArray(), &m_filter, polyPath, &numPolys, 2048)) & DT_SUCCESS) && !allowPartial)
+		if (!((status = query->findPath(startPoly, endPoly, polyStart.toFloatArray(), polyEnd.toFloatArray(), &m_filter, polyPath, &numPolys, MAX_POLYS)) & DT_SUCCESS))
 			return false;
+
+#ifdef DEBUG_PATHING
+		info("findPath result: 0x" + String::hexvalueOf(status), true);
+#endif
+
+		if ((status & DT_PARTIAL_RESULT) && !allowPartial)
+			return false;
+
+		if (path == nullptr)
+			return true;
 
 		if (numPolys) {
 			// In case of partial path, make sure the end point is clamped to the last polygon.
 			float epos[3];
 			dtVcopy(epos, polyEnd.toFloatArray());
 			if (polyPath[numPolys - 1] != endPoly) {
-				
 #ifdef DEBUG_PATHING
 				info("Poly mismatch: Expected: " + String::hexvalueOf((int64)endPoly) + " actual: " + String::hexvalueOf((int64)polyPath[numPolys-1]), true);
 #endif
-
 				if (allowPartial)
 					query->closestPointOnPoly(polyPath[numPolys - 1], tarPosAsFloat, polyEnd.toFloatArray(), 0);
 				else
 					return false;
 			}
 
-			unsigned char flags[128];
-			float pathPoints[128][3];
+			static constexpr int MAX_PATH_POINTS = 256;
+
+			float pathPoints[MAX_PATH_POINTS][3];
 			int numPoints = 0;
+			int pathOptions = DT_STRAIGHTPATH_ALL_CROSSINGS;
 
 			status = query->findStraightPath(polyStart.toFloatArray(), polyEnd.toFloatArray(),
 									polyPath, numPolys,
 									(float*) pathPoints, NULL, NULL,
-									&numPoints, 128, 0);
-
+									&numPoints, MAX_PATH_POINTS, pathOptions);
+#ifdef DEBUG_PATHING
+			info("findStraightPath result: 0x" + String::hexvalueOf(status), true);
+#endif
 			if (numPoints > 0) {
 				for (int i = 0; i < numPoints; i++) {
 					//info("PathFind Point : " + point.toString(), true);
@@ -224,6 +255,7 @@ bool PathFinderManager::getRecastPath(const Vector3& start, const Vector3& end, 
 			}
 		}
 	}
+
 	return true;
 }
 
@@ -236,7 +268,7 @@ Vector<WorldCoordinates>* PathFinderManager::findPathFromWorldToWorld(const Worl
 	t.start();
 #endif
 
-	for(const WorldCoordinates& pointB : endPoints) {
+	for (const WorldCoordinates& pointB : endPoints) {
 		const Vector3& startTemp = pointA.getPoint();
 		const Vector3& targetTemp = pointB.getPoint();
 
@@ -244,7 +276,7 @@ Vector<WorldCoordinates>* PathFinderManager::findPathFromWorldToWorld(const Worl
 
 		Vector3 mid = startTemp + ((targetTemp-startTemp) * 0.5f);
 
-		zone->getInRangeNavMeshes(mid.getX(), mid.getY(), &areas, false);
+		zone->getInRangeNavMeshes(mid.getX(), mid.getY(), &areas, true);
 
 		SortedVector<NavCollision*> collisions;
 		getNavMeshCollisions(&collisions, &areas, pointA.getWorldPosition(), pointB.getWorldPosition());
@@ -254,16 +286,31 @@ Vector<WorldCoordinates>* PathFinderManager::findPathFromWorldToWorld(const Worl
 		float len = 0.0f;
 
 		try {
-			if (collisions.size() == 1) { // we're entering a navmesh
+			int collisionSize = collisions.size();
+
+			if (collisionSize == 1) { // we're entering/exiting a navmesh
 				NavCollision* collision = collisions.get(0);
 				NavArea *area = collision->getNavArea();
 				Vector3 position = collision->getPosition();
-				position.setZ(zone->getHeightNoCache(position.getX(), position.getY()));
+				position.setZ(CollisionManager::getWorldFloorCollision(position.getX(), position.getY(), zone, true));
 
-				path->add(pointA);
-
-				if (!getRecastPath(position, targetTemp, area, path, len, allowPartial)) { // entering navmesh
+				if (area->containsPoint(startTemp.getX(), startTemp.getY())) {
+					if (!getRecastPath(startTemp, position, area, path, len, allowPartial)) { // exiting navmesh
+						delete collision;
+						if (path != NULL) delete path;
 						continue;
+					}
+
+					path->add(pointB);
+
+				} else {
+					path->add(pointA);
+
+					if (!getRecastPath(position, targetTemp, area, path, len, allowPartial)) { // entering navmesh
+						delete collision;
+						if (path != NULL) delete path;
+						continue;
+					}
 				}
 
 				if (len > 0 && len < finalLengthSq) {
@@ -274,7 +321,7 @@ Vector<WorldCoordinates>* PathFinderManager::findPathFromWorldToWorld(const Worl
 					finalpath = path;
 					path = NULL;
 				}
-			} else { // we're already inside a navmesh
+			} else if (collisionSize == 0) { // we're already inside a navmesh (or there are no navmeshes around)
 				for (int i = 0; i < areas.size(); i++) {
 					if (!getRecastPath(startTemp, targetTemp, areas.get(i), path, len, allowPartial)) {
 						continue;
@@ -289,6 +336,42 @@ Vector<WorldCoordinates>* PathFinderManager::findPathFromWorldToWorld(const Worl
 						path = new Vector<WorldCoordinates>();
 					}
 				}
+			} else if (collisionSize == 2) { // we're crossing over a mesh or dealing with multiple meshes
+				NavCollision* collision1 = collisions.get(0);
+				NavArea *area1 = collision1->getNavArea();
+				NavCollision* collision2 = collisions.get(1);
+				NavArea *area2 = collision2->getNavArea();
+
+				if (area1 == area2) { // crossing same mesh
+					path->add(pointA);
+
+					Vector3 position1 = collision1->getPosition();
+					position1.setZ(CollisionManager::getWorldFloorCollision(position1.getX(), position1.getY(), zone, false));
+					Vector3 position2 = collision2->getPosition();
+					position2.setZ(CollisionManager::getWorldFloorCollision(position2.getX(), position2.getY(), zone, false));
+
+					if (!getRecastPath(position1, position2, area1, path, len, allowPartial)) {
+						delete collision1;
+						delete collision2;
+						if (path != NULL) delete path;
+						continue;
+					}
+
+					path->add(pointB);
+
+					if (len > 0 && len < finalLengthSq) {
+						if (finalpath)
+							delete finalpath;
+
+						finalLengthSq = len;
+						finalpath = path;
+						path = NULL;
+					}
+				} else { // TODO: handle multiple meshes
+
+				}
+			} else { // TODO: handle multiple meshes
+
 			}
 		} catch (...) {
 			error("Unhandled pathing exception");
@@ -963,41 +1046,46 @@ float frand() {
 }
 
 
-bool PathFinderManager::getSpawnPointInArea(const Sphere& area, Zone *zone, Vector3& point, bool checkRaycast) {
+bool PathFinderManager::getSpawnPointInArea(const Sphere& area, Zone *zone, Vector3& point, bool checkPath) {
 	SortedVector<ManagedReference<NavArea*>> areas;
 	float radius = area.getRadius();
 	const Vector3& center = area.getCenter();
 	Vector3 flipped(center.getX(), center.getZ(), -center.getY());
 	float extents[3] = {3, 5, 3};
 
-	dtNavMeshQuery *query = m_navQuery.get();
-	if(query == NULL) {
-		query = dtAllocNavMeshQuery();
-		m_navQuery.set(query);
-	}
+	dtNavMeshQuery* query = getNavQuery();
 
 	if (zone == NULL)
 		return false;
 
-	zone->getInRangeNavMeshes(center.getX(), center.getY(), &areas, false);
+	zone->getInRangeNavMeshes(center.getX(), center.getY(), &areas, true);
 
-	for (const auto& area : areas) {
+	if (areas.size() == 0) {
+		Vector3 temp((frand() * 2.0f) - 1.0f, (frand() * 2.0f) - 1.0f, 0);
+		Vector3 result = temp * (frand() * radius);
+		point = center + result;
+		point.setZ(CollisionManager::getWorldFloorCollision(point.getX(), point.getY(), zone, false));
+		return true;
+	}
+
+	for (const auto& navArea : areas) {
 		Vector3 polyStart;
 		dtPolyRef startPoly;
 		dtPolyRef ref;
 		int status = 0;
 		float pt[3];
 
-		RecastNavMesh *mesh = area->getNavMesh();
+		RecastNavMesh *mesh = navArea->getNavMesh();
 		if (mesh == NULL)
 			continue;
+
+		ReadLocker rLocker(navArea);
 
 		dtNavMesh *dtNavMesh = mesh->getNavMesh();
 		if (dtNavMesh == NULL)
 			continue;
 
-		ReadLocker rLocker(mesh->getLock());
-		query->init(dtNavMesh, 2048);
+		query->init(dtNavMesh, MAX_QUERY_NODES);
 
 		if (!((status = query->findNearestPoly(flipped.toFloatArray(), extents, &m_spawnFilter, &startPoly, polyStart.toFloatArray())) & DT_SUCCESS))
 			continue;
@@ -1008,20 +1096,7 @@ bool PathFinderManager::getSpawnPointInArea(const Sphere& area, Zone *zone, Vect
 																   frand, &ref, pt)) & DT_SUCCESS)) {
 					continue;
 				} else {
-					point = Vector3(pt[0], -pt[2], zone->getHeightNoCache(pt[0], -pt[2]));
-
-					if (checkRaycast) {
-						dtPolyRef path[64];
-						dtRaycastHit hit;
-						hit.path = path;
-						hit.maxPath = 64;
-
-						dtPolyRef dummy = 0;
-						if (!((status = query->raycast(startPoly, polyStart.toFloatArray(), pt, &m_spawnFilter, 0, &hit,
-													   dummy)) & DT_SUCCESS)) {
-							continue;
-						}
-					}
+					point = Vector3(pt[0], -pt[2], CollisionManager::getWorldFloorCollision(pt[0], -pt[2], zone, false));
 
 					Vector3 temp = point - center;
 					float len = temp.length();
@@ -1031,8 +1106,15 @@ bool PathFinderManager::getSpawnPointInArea(const Sphere& area, Zone *zone, Vect
 						temp.setY(temp.getY() * multiplier);
 						point = center + temp;
 
-						point.setZ(zone->getHeightNoCache(point.getX(), point.getY()));
+						point.setZ(CollisionManager::getWorldFloorCollision(point.getX(), point.getY(), zone, false));
 					}
+
+					if (checkPath) {
+						if (!getRecastPath(center, point, navArea, nullptr, len, false)) {
+							continue;
+						}
+					}
+
 					return true;
 				}
 			} catch (Exception& exc) {

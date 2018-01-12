@@ -25,20 +25,21 @@ include pathfinding.RecastNavMesh;
 import system.thread.Mutex;
 import engine.util.u3d.AABB;
 import server.zone.objects.pathfinding.NavArea;
+include engine.core.ManagedObject;
 include system.util.Vector;
+include system.util.SortedVector;
+include system.util.VectorMap;
+include engine.log.Logger;
 
 class CityRegion extends ManagedObject implements Logger {
 
 	@weakReference
-	protected transient NavArea navMesh;
+	protected NavArea navMesh;
 
 	protected byte cityRank;
 
 	@dereferenced
 	protected StringId regionName;
-
-	@dereferenced
-	protected string navMeshName;
 
 	@dereferenced
 	protected VectorMap<unsigned long, int> candidates;
@@ -246,17 +247,6 @@ class CityRegion extends ManagedObject implements Logger {
 		return assessmentPending;
 	}
 
-	@local
-	@dirty
-	public RecastNavMesh getNavMesh() {
-		NavArea strongRef = navMesh;
-
-		if (strongRef == null)
-			return null;
-
-		return strongRef.getNavMesh();
-	}
-
 	@preLocked
 	public void setAssessmentPending(boolean pend) {
 		assessmentPending = pend;
@@ -334,13 +324,6 @@ class CityRegion extends ManagedObject implements Logger {
 	@dirty
 	public Zone getZone() {
 		return zone.get();
-	}
-
-	@dirty
-	public native string getNavMeshName();
-
-	public void setNavMeshName(string name) {
-		navMeshName = name;
 	}
 
 	@dirty

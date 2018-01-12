@@ -40,8 +40,10 @@ Vector3 SpawnAreaImplementation::getRandomPosition(SceneObject* player) {
 	bool positionFound = false;
 	int retries = 10;
 
+	const auto worldPosition = player->getWorldPosition();
+
 	while (!positionFound && retries-- > 0) {
-		position = areaShape->getRandomPosition(player->getWorldPosition(), 64.0f, 256.0f);
+		position = areaShape->getRandomPosition(worldPosition, 64.0f, 256.0f);
 
 		positionFound = true;
 
@@ -148,6 +150,10 @@ void SpawnAreaImplementation::tryToSpawn(SceneObject* object) {
 	Vector3 randomPosition = getRandomPosition(object);
 
 	if (randomPosition.getX() == 0 && randomPosition.getY() == 0) {
+		return;
+	}
+
+	if (!zone->isWithinBoundaries(randomPosition)) {
 		return;
 	}
 

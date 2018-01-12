@@ -18,6 +18,8 @@
 #include "templates/tangible/SharedStructureObjectTemplate.h"
 #include "server/zone/managers/city/PayPropertyTaxTask.h"
 #include "server/zone/objects/pathfinding/NavArea.h"
+#include "server/zone/managers/planet/PlanetManager.h"
+#include "server/zone/managers/credit/CreditManager.h"
 
 void StructureObjectImplementation::loadTemplateData(SharedObjectTemplate* templateData) {
 	TangibleObjectImplementation::loadTemplateData(templateData);
@@ -41,45 +43,63 @@ void StructureObjectImplementation::finalize() {
 }
 
 void StructureObjectImplementation::createNavMesh() {
+	if (server->getZoneServer()->shouldDeleteNavAreas() && navArea != NULL) {
+		ManagedReference<NavArea*> nav = navArea;
+		zone->getPlanetManager()->dropNavArea(nav->getMeshName());
 
-	navArea = zone->getZoneServer()->createObject(STRING_HASHCODE("object/region_navmesh.iff"),
-														isPersistent()).castTo<NavArea *>();
+		Core::getTaskManager()->executeTask([nav] {
+			Locker locker(nav);
+			nav->destroyObjectFromWorld(true);
+			nav->destroyObjectFromDatabase(true);
+		}, "destroyStructureNavAreaLambda");
+
+		navArea = NULL;
+	}
 
 	if (navArea == NULL) {
-		error("Failed to create navmesh");
-		return;
-	}
+		navArea = zone->getZoneServer()->createObject(STRING_HASHCODE("object/region_navmesh.iff"), "navareas", isPersistent()).castTo<NavArea *>();
 
-	Locker clocker(navArea, _this.getReferenceUnsafeStaticCast());
+		if (navArea == NULL) {
+			error("Failed to create navmesh");
+			return;
+		}
 
-	String name = String::valueOf(getObjectID());
+		Locker clocker(navArea, _this.getReferenceUnsafeStaticCast());
 
-	float length = 32.0f;
+		String name = String::valueOf(getObjectID());
 
-	for(const auto& child : childObjects) {
-		const BaseBoundingVolume* boundingVolume = child->getBoundingVolume();
+		float length = 32.0f;
+
+		for (const auto& child : childObjects) {
+			const BaseBoundingVolume* boundingVolume = child->getBoundingVolume();
+			if (boundingVolume) {
+				const AABB& box = boundingVolume->getBoundingBox();
+				float distance = (child->getWorldPosition() - getWorldPosition()).length();
+				float radius = box.extents()[box.longestAxis()];
+				if (distance + radius > length)
+					length = radius + distance;
+			}
+		}
+
+		const BaseBoundingVolume* boundingVolume = getBoundingVolume();
 		if (boundingVolume) {
 			const AABB& box = boundingVolume->getBoundingBox();
-			float distance = (child->getWorldPosition() - getWorldPosition()).length();
 			float radius = box.extents()[box.longestAxis()];
-			if(distance + radius > length)
+			if (radius > length)
 				length = radius;
 		}
+
+		Vector3 position = Vector3(getPositionX(), 0, getPositionY());
+		// This is invoked when a new faction base is placed, always force a rebuild
+		navArea->initializeNavArea(position, length * 1.25f, zone, name, true);
+
+		zone->transferObject(navArea, -1, false);
+
+		zone->getPlanetManager()->addNavArea(name, navArea);
+
+	} else if (!navArea->isNavMeshLoaded()) {
+		navArea->updateNavMesh(navArea->getBoundingBox());
 	}
-
-	const BaseBoundingVolume* boundingVolume = getBoundingVolume();
-	if (boundingVolume) {
-		const AABB& box = boundingVolume->getBoundingBox();
-		float radius = box.extents()[box.longestAxis()];
-		if(radius > length)
-			length = radius;
-	}
-
-	Vector3 position = Vector3(getPositionX(), 0, getPositionY());
-	// This is invoked when a new faction base is placed, always force a rebuild
-	navArea->initializeNavArea(position, length * 1.25f, zone, name, true, true);
-
-	zone->transferObject(navArea, -1, false);
 }
 
 void StructureObjectImplementation::notifyLoadFromDatabase() {
@@ -152,6 +172,9 @@ void StructureObjectImplementation::notifyInsertToZone(Zone* zone) {
 		scheduleMaintenanceExpirationEvent();
 	}
 
+	if (isGCWBase() && !isClientObject()) {
+		createNavMesh();
+	}
 }
 
 int StructureObjectImplementation::getLotSize() {
@@ -296,7 +319,22 @@ void StructureObjectImplementation::destroyObjectFromWorld(bool sendSelfDestroy)
 		structureMaintenanceTask = NULL;
 	}
 
+	if (navArea != NULL) {
+		ManagedReference<NavArea*> nav = navArea;
+		Core::getTaskManager()->executeTask([nav, sendSelfDestroy] () {
+			Locker locker(nav);
+			nav->destroyObjectFromWorld(sendSelfDestroy);
+		}, "destroyStructureNavAreaLambda2");
+	}
+
 	TangibleObjectImplementation::destroyObjectFromWorld(sendSelfDestroy);
+}
+
+void StructureObjectImplementation::destroyObjectFromDatabase(bool destroyContainedObjects) {
+	if (navArea != NULL)
+		navArea->destroyObjectFromDatabase(true);
+
+	TangibleObjectImplementation::destroyObjectFromDatabase(destroyContainedObjects);
 }
 
 bool StructureObjectImplementation::isOwnerOf(SceneObject* obj) {
@@ -402,24 +440,25 @@ int StructureObjectImplementation::getDecayPercentage() {
 	}
 }
 
-void StructureObjectImplementation::payMaintenance(int maintenance, CreatureObject* payer, bool cashFirst) {
+void StructureObjectImplementation::payMaintenance(int maintenance, CreditObject* creditObj, bool cashFirst) {
 	//Pay maintenance.
+
 	int payedSoFar;
 	if (cashFirst) {
-		if (payer->getCashCredits() >= maintenance) {
-			payer->subtractCashCredits(maintenance);
+		if (creditObj->getCashCredits() >= maintenance) {
+			creditObj->subtractCashCredits(maintenance);
 		} else {
-			payedSoFar = payer->getCashCredits();
-			payer->subtractCashCredits(payedSoFar);
-			payer->subtractBankCredits(maintenance - payedSoFar);
+			payedSoFar = creditObj->getCashCredits();
+			creditObj->subtractCashCredits(payedSoFar);
+			creditObj->subtractBankCredits(maintenance - payedSoFar);
 		}
 	} else {
-		if (payer->getBankCredits() >= maintenance) {
-			payer->subtractBankCredits(maintenance);
+		if (creditObj->getBankCredits() >= maintenance) {
+			creditObj->subtractBankCredits(maintenance);
 		} else {
-			payedSoFar = payer->getBankCredits();
-			payer->subtractBankCredits(payedSoFar);
-			payer->subtractCashCredits(maintenance - payedSoFar);
+			payedSoFar = creditObj->getBankCredits();
+			creditObj->subtractBankCredits(payedSoFar);
+			creditObj->subtractCashCredits(maintenance - payedSoFar);
 		}
 	}
 	addMaintenance(maintenance);

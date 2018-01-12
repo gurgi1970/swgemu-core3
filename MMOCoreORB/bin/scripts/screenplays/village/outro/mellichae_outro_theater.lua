@@ -48,8 +48,8 @@ MellichaeOutroTheater = GoToTheater:new {
 		{ template = "sith_shadow_thug", minimumDistance = 8, maximumDistance = 36, referencePoint = 0 },
 		{ template = "sith_shadow_thug", minimumDistance = 8, maximumDistance = 36, referencePoint = 0 }
 	},
-	despawnTime =  60 * 60 * 1000, -- 1 hour
-	activeAreaRadius = 72 -- Make sure we grab the entering of radius.
+	activeAreaRadius = 72, -- Make sure we grab the entering of radius.
+	flattenLayer = true
 }
 
 -- Event handler for the enter active area event.
@@ -109,9 +109,15 @@ function MellichaeOutroTheater:onMellichaeKilled(pMellichae, pKiller)
 	if (pOwner == nil) then
 		return 1
 	end
-	
+
+	local pTheater = self:getTheaterObject(pOwner)
+
+	if (pTheater == nil) then
+		return 1
+	end
+
 	local pInventory = SceneObject(pMellichae):getSlottedObject("inventory")
-	
+
 	if (pInventory ~= nil) then
 		SceneObject(pInventory):setContainerOwnerID(ownerID)
 		createLoot(pInventory, "mellichae_outro", 1, true)
@@ -123,7 +129,32 @@ function MellichaeOutroTheater:onMellichaeKilled(pMellichae, pKiller)
 	VillageJediManagerCommon.setJediProgressionScreenPlayState(pOwner, VILLAGE_JEDI_PROGRESSION_DEFEATED_MELLIACHAE) -- Killed him.
 	FsOutro:setCurrentStep(pOwner, 4)
 	PadawanTrials:doPadawanTrialsSetup(pOwner)
-	createEvent(10 * 1000, "MellichaeOutroTheater", "finish", pOwner, "")
+
+	local pActiveArea = spawnActiveArea(CreatureObject(pOwner):getZoneName(), "object/active_area.iff", SceneObject(pTheater):getWorldPositionX(), 0, SceneObject(pTheater):getWorldPositionY(), 150, 0)
+
+	if (pActiveArea ~= nil) then
+		writeData(SceneObject(pActiveArea):getObjectID() .. ":ownerID", ownerID)
+		createObserver(EXITEDAREA, "MellichaeOutroTheater", "handleExitedMissionAreaEvent", pActiveArea)
+	end
+
+	createEvent(600 * 1000, "MellichaeOutroTheater", "finish", pOwner, "")
+
+	return 1
+end
+
+function MellichaeOutroTheater:handleExitedMissionAreaEvent(pActiveArea, pPlayer, nothing)
+	if not SceneObject(pPlayer):isPlayerCreature() then
+		return 0
+	end
+
+	local areaID = SceneObject(pActiveArea):getObjectID()
+
+	if (readData(areaID .. ":ownerID") ~= SceneObject(pPlayer):getObjectID()) then
+		return 0
+	end
+
+	deleteData(areaID .. ":ownerID")
+	self:finish(pPlayer)
 
 	return 1
 end
@@ -246,7 +277,7 @@ function MellichaeOutroTheater:helpCrystal(pKiller, color, ownerID)
 			greetingString = LuaStringIdChatParameter("@quest/force_sensitive/exit:taunt2")
 		end
 
-		local firstName = CreatureObject(pKiller):getFirstName()
+		local firstName = CreatureObject(pOwner):getFirstName()
 		greetingString:setTT(firstName)
 		spatialChat(pDaktar, greetingString:_getObject())
 		AiAgent(pDaktar):setDefender(pKiller)
@@ -258,7 +289,7 @@ function MellichaeOutroTheater:helpCrystal(pKiller, color, ownerID)
 
 		if (pMellichae ~= nil and not CreatureObject(pMellichae):isDead()) then
 			local greetingString = LuaStringIdChatParameter("@quest/force_sensitive/exit:taunt3")
-			local firstName = CreatureObject(pKiller):getFirstName()
+			local firstName = CreatureObject(pOwner):getFirstName()
 			greetingString:setTT(firstName)
 			spatialChat(pMellichae, greetingString:_getObject())
 			AiAgent(pMellichae):setDefender(pKiller)

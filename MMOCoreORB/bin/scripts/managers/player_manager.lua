@@ -44,6 +44,9 @@
 --GENERAL PLAYER SETTINGS
 -----------------------------------
 
+onlineCharactersPerAccount = 2 --How many characters are allowed online from a single account.
+allowSameAccountPvpRatingCredit = 0
+
 --Blue frog / GM buff values
 performanceBuff = 1000
 medicalBuff = 1900

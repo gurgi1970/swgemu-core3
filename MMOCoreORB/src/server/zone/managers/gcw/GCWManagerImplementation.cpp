@@ -333,7 +333,7 @@ bool GCWManagerImplementation::hasTooManyBasesNearby(int x, int y) {
 		return true;
 
 	SortedVector<QuadTreeEntry*> inRangeObjects;
-	zone->getInRangeObjects(x, y, 600, &inRangeObjects, true);
+	zone->getInRangeObjects(x, y, 600, &inRangeObjects, true, false);
 	int count = 0;
 
 	for (int i = 0; i < inRangeObjects.size(); ++i) {
@@ -1591,7 +1591,7 @@ void GCWManagerImplementation::broadcastBuilding(BuildingObject* building, Strin
 		zone->getInRangeObjects(building->getPositionX(), building->getPositionY(), range, &closeObjects, true);
 	} else {
 		CloseObjectsVector* closeVector = (CloseObjectsVector*) building->getCloseObjects();
-		closeVector->safeCopyTo(closeObjects);
+		closeVector->safeCopyReceiversTo(closeObjects, CloseObjectsVector::PLAYERTYPE);
 	}
 
 	// send message to all the players in range
@@ -1678,10 +1678,10 @@ void GCWManagerImplementation::resetVulnerability(CreatureObject* creature, Buil
 	baseData->setLastVulnerableTime(nextTime);
 
 	nextTime.addMiliTime(vulnerabilityFrequency * 1000);
-	baseData->setNextVulnerableTime(nextTime.getTime());
+	baseData->setNextVulnerableTime(nextTime);
 
 	nextTime.addMiliTime(vulnerabilityDuration * 1000);
-	baseData->setVulnerabilityEndTime(nextTime.getTime());
+	baseData->setVulnerabilityEndTime(nextTime);
 
 
 	Reference<Task*> task = getStartTask(building->getObjectID());

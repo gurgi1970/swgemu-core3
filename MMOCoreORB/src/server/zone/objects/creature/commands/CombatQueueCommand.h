@@ -153,12 +153,12 @@ public:
 			return INVALIDWEAPON;
 
 		if (rangeToCheck == -1)
-			rangeToCheck = MAX(10.f, weapon->getMaxRange());
+			rangeToCheck = (float) Math::max(10, weapon->getMaxRange());
 
 		if (creature->isDead() || (creature->isPet() && creature->isIncapacitated()))
 			return INVALIDLOCOMOTION;
 
-		if (creature->isPlayerCreature()){
+		if (creature->isPlayerCreature()) {
 			PlayerObject* ghost = creature->getPlayerObject();
 
 			if (ghost != NULL) {
@@ -176,13 +176,12 @@ public:
 
 						if (targetCreature != NULL) {
 							if (targetCreature->isPlayerCreature()) {
-								if (!CombatManager::instance()->areInDuel(creature, targetCreature) && targetCreature->getFactionStatus() == FactionStatus::OVERT) {
-										ghost->doFieldFactionChange(FactionStatus::OVERT);
-								}
+								if (!CombatManager::instance()->areInDuel(creature, targetCreature) && !targetCreature->hasBountyMissionFor(creature) && !creature->hasBountyMissionFor(targetCreature) && targetCreature->getFactionStatus() == FactionStatus::OVERT)
+									ghost->doFieldFactionChange(FactionStatus::OVERT);
 							} else if (targetCreature->isPet()) {
 								ManagedReference<CreatureObject*> targetOwner = targetCreature->getLinkedCreature().get();
 
-								if (targetOwner != NULL && !CombatManager::instance()->areInDuel(creature, targetOwner) && targetOwner->getFactionStatus() == FactionStatus::OVERT) {
+								if (targetOwner != NULL && !creature->hasBountyMissionFor(targetOwner) && !targetOwner->hasBountyMissionFor(creature) && !CombatManager::instance()->areInDuel(creature, targetOwner) && targetOwner->getFactionStatus() == FactionStatus::OVERT) {
 										ghost->doFieldFactionChange(FactionStatus::OVERT);
 								}
 							} else {
@@ -206,7 +205,7 @@ public:
 		if (creature->isProne() && (weapon->isMeleeWeapon() || poolsToDamage == 0))
 			return NOPRONE;
 
-		if(!checkDistance(creature, targetObject, rangeToCheck))
+		if (!checkDistance(creature, targetObject, rangeToCheck))
 			return TOOFAR;
 
 		if (weapon->isRangedWeapon() && creature->isProne() && checkDistance(targetObject, creature, 7))
@@ -234,30 +233,6 @@ public:
 
 		CombatManager* combatManager = CombatManager::instance();
 
-		bool shouldTef = false;
-
-		if (creature->isPlayerCreature() && targetObject->isPlayerCreature()) {
-			if (!combatManager->areInDuel(creature, targetObject.castTo<CreatureObject*>())) {
-				shouldTef = true;
-			}
-		} else if (creature->isPet() && targetObject->isPlayerCreature()) {
-			ManagedReference<CreatureObject*> owner = creature->getLinkedCreature().get();
-
-			if (owner != NULL && owner->isPlayerCreature()) {
-				if (!combatManager->areInDuel(owner, targetObject.castTo<CreatureObject*>())) {
-					shouldTef = true;
-				}
-			}
-		} else if (creature->isPlayerCreature() && (targetObject->isPet() || targetObject->isVehicleObject())) {
-			ManagedReference<CreatureObject*> targetOwner = targetObject.castTo<CreatureObject*>()->getLinkedCreature().get();
-
-			if (targetOwner != NULL && targetOwner->isPlayerCreature()) {
-				if (!combatManager->areInDuel(creature, targetOwner)) {
-					shouldTef = true;
-				}
-			}
-		}
-
 		try {
 			int res = combatManager->doCombatAction(creature, weapon, cast<TangibleObject*>(targetObject.get()), CreatureAttackData(arguments, this, target));
 
@@ -279,26 +254,6 @@ public:
 		// only clear aiming states if command was successful
 		creature->removeStateBuff(CreatureState::AIMING);
 		creature->removeBuff(STRING_HASHCODE("steadyaim"));
-
-		// Update PvP TEF Duration
-		if (shouldTef && creature->isPlayerCreature()) {
-			PlayerObject* ghost = creature->getPlayerObject().get();
-
-			if (ghost != NULL) {
-				ghost->updateLastPvpCombatActionTimestamp();
-			}
-		} else if (shouldTef && creature->isPet()) {
-			ManagedReference<CreatureObject*> owner = creature->getLinkedCreature().get();
-
-			if (owner != NULL && owner->isPlayerCreature()) {
-				PlayerObject* ownerGhost = owner->getPlayerObject().get();
-
-				if (ownerGhost != NULL) {
-					Locker olocker(owner, creature);
-					ownerGhost->updateLastPvpCombatActionTimestamp();
-				}
-			}
-		}
 
 		return SUCCESS;
 	}
@@ -663,7 +618,7 @@ public:
 
 		targetDefense -= mod;
 
-		uint32 duration = MAX(5, effect.getStateLength()*(1.f-targetDefense/120.f));
+		uint32 duration = (uint32) Math::max(5.f, effect.getStateLength()*(1.f-targetDefense/120.f));
 
 		switch (effectType) {
 		case CommandEffect::BLIND:

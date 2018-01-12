@@ -20,10 +20,7 @@ FsReflex2Theater = GoToTheater:new {
 		{ template = "sith_shadow_pirate", x = -11.14, y = -7.26 },
 		{ template = "sith_shadow_thug", x = -2.57, y = 12.67 }
 	},
-	despawnTime = 20 * 60 * 1000, -- 20 minutes
-	activeAreaRadius = 16,
-	onFailedSpawn = nil,
-	onEnteredActiveArea = nil
+	activeAreaRadius = 16
 }
 
 function FsReflex2Theater:onEnteredActiveArea(pPlayer, mobileList)
@@ -57,6 +54,14 @@ function FsReflex2Theater:onTheaterCreated(pPlayer)
 	QuestManager.completeQuest(pPlayer, QuestManager.quests.FS_REFLEX_FETCH_QUEST_01)
 	QuestManager.activateQuest(pPlayer, QuestManager.quests.FS_REFLEX_FETCH_QUEST_02)
 	createObserver(OBJECTDESTRUCTION, self.taskName, "onPlayerKilled", pPlayer)
+end
+
+function FsReflex2Theater:onTheaterFinished(pPlayer)
+	if (pPlayer == nil) then
+		return
+	end
+
+	dropObserver(OBJECTDESTRUCTION, self.taskName, "onPlayerKilled", pPlayer)
 end
 
 function FsReflex2Theater:onPlayerKilled(pPlayer, pKiller, nothing)

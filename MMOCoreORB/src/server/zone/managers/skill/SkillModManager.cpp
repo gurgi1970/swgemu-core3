@@ -181,7 +181,7 @@ void SkillModManager::verifyWearableSkillMods(CreatureObject* creature) {
 	}
 
 	if(!compareMods(mods, creature, WEARABLE)) {
-		error("Wearable mods don't match for " + creature->getFirstName());
+		warning("Wearable mods don't match for " + creature->getFirstName());
 	}
 }
 
@@ -228,7 +228,7 @@ void SkillModManager::verifyStructureSkillMods(TangibleObject* tano) {
 
 
 	if (!compareMods(mods, creature, STRUCTURE)) {
-		error("Structure mods don't match for " + creature->getFirstName());
+		warning("Structure mods don't match for " + creature->getFirstName());
 	}
 }
 
@@ -256,7 +256,7 @@ void SkillModManager::verifySkillBoxSkillMods(CreatureObject* creature) {
 	}
 
 	if(!compareMods(mods, creature, SKILLBOX)) {
-		error("SkillBox mods don't match for " + creature->getFirstName());
+		warning("SkillBox mods don't match for " + creature->getFirstName());
 	}
 }
 
@@ -284,7 +284,7 @@ void SkillModManager::verifyBuffSkillMods(CreatureObject* creature) {
 	}
 
 	if(!compareMods(mods, creature, BUFF)) {
-		error("Buff mods don't match for " + creature->getFirstName());
+		warning("Buff mods don't match for " + creature->getFirstName());
 	}
 }
 
@@ -314,7 +314,7 @@ bool SkillModManager::compareMods(VectorMap<String, int>& mods, CreatureObject* 
 	bool match = true;
 
 	StringBuffer compare;
-	compare << "	" << "SkillMod" << "  " << "Player" << "	" << "Computed" << endl;
+	compare << endl << "	" << "SkillMod" << "  " << "Player" << "	" << "Computed" << endl;
 
 	for(int i = 0; i < group->size(); ++i) {
 		String key = group->elementAt(i).getKey();
@@ -336,10 +336,17 @@ bool SkillModManager::compareMods(VectorMap<String, int>& mods, CreatureObject* 
 
 	if(!mods.isEmpty()) {
 		match = false;
+
+		for (int i = 0; i < mods.size(); i++) {
+			String key = mods.elementAt(i).getKey();
+			int currentValue = mods.get(key);
+
+			compare << "	" << key << "	" << "none" << "	" << currentValue << endl;
+		}
 	}
 
 	if(match == false) {
-		error(compare.toString());
+		warning(compare.toString());
 
 		if(creature->getPlayerObject() != NULL) {
 			if(creature->getPlayerObject()->getDebug()) {

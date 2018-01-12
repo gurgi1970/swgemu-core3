@@ -357,7 +357,7 @@ void SuiManager::handleCharacterBuilderSelectItem(CreatureObject* player, SuiBox
 
 			if (templatePath == "unlearn_all_skills") {
 
-				SkillManager::instance()->surrenderAllSkills(player);
+				SkillManager::instance()->surrenderAllSkills(player, true, false);
 				player->sendSystemMessage("All skills unlearned.");
 
 			} else if (templatePath == "cleanse_character") {
@@ -372,12 +372,21 @@ void SuiManager::handleCharacterBuilderSelectItem(CreatureObject* player, SuiBox
 				} else {
 					player->sendSystemMessage("Not within combat.");
 				}
+			} else if (templatePath == "fill_force_bar") {
+				if (ghost->isJedi()) {
+					if (!player->isInCombat()) {
+						player->sendSystemMessage("You force bar has been filled.");
 
+						ghost->setForcePower(ghost->getForcePowerMax(), true);
+					} else {
+						player->sendSystemMessage("Not within combat.");
+					}
+				}
 			} else if (templatePath == "reset_buffs") {
 				if (!player->isInCombat()) {
 					player->sendSystemMessage("Your buffs have been reset.");
 
-					player->clearBuffs(true);
+					player->clearBuffs(true, false);
 
 					ghost->setFoodFilling(0);
 					ghost->setDrinkFilling(0);
@@ -518,6 +527,9 @@ void SuiManager::handleCharacterBuilderSelectItem(CreatureObject* player, SuiBox
 
 			} else if (templatePath == "become_glowy") {
 				bluefrog->grantGlowyBadges(player);
+
+			} else if (templatePath == "unlock_jedi_initiate") {
+				bluefrog->grantJediInitiate(player);
 
 			} else {
 				if (templatePath.length() > 0) {

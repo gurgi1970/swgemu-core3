@@ -261,9 +261,64 @@ Vector<float>* CollisionManager::getCellFloorCollision(float x, float y, CellObj
 	return collisions;
 }
 
+float CollisionManager::getWorldFloorCollision(float x, float y, float z, Zone* zone, bool testWater) {
+	PlanetManager* planetManager = zone->getPlanetManager();
+
+	if (planetManager == NULL)
+		return 0.f;
+
+	SortedVector<QuadTreeEntry*> closeObjects;
+	zone->getInRangeObjects(x, y, 128, &closeObjects, true, false);
+
+	float height = 0;
+
+	TerrainManager* terrainManager = planetManager->getTerrainManager();
+
+	//need to include exclude affectors in the terrain calcs
+	height = terrainManager->getHeight(x, y);
+
+	if (z < height)
+		return height;
+
+	if (testWater) {
+		float waterHeight;
+
+		if (terrainManager->getWaterHeight(x, y, waterHeight))
+			if (waterHeight > height)
+				height = waterHeight;
+	}
+
+	Ray ray(Vector3(x, z+2.0f, y), Vector3(0, -1, 0));
+
+	for (const auto& entry : closeObjects) {
+		SceneObject* sceno = static_cast<SceneObject*>(entry);
+
+		const AppearanceTemplate* app = getCollisionAppearance(sceno, 255);
+
+		if (app != NULL) {
+			Ray rayModelSpace = convertToModelSpace(ray.getOrigin(), ray.getOrigin()+ray.getDirection(), sceno);
+
+			IntersectionResults results;
+
+			app->intersects(rayModelSpace, 16384 * 2, results);
+
+			if (results.size()) { // results are ordered based on intersection distance from min to max
+				float floorHeight = 16384.f - results.getUnsafe(0).getIntersectionDistance();
+
+				if (floorHeight > height)
+					height = floorHeight;
+			}
+		} else {
+			continue;
+		}
+	}
+
+	return height;
+}
+
 float CollisionManager::getWorldFloorCollision(float x, float y, Zone* zone, bool testWater) {
-	SortedVector<ManagedReference<QuadTreeEntry*> > closeObjects;
-	zone->getInRangeObjects(x, y, 128, &closeObjects, true);
+	SortedVector<QuadTreeEntry*> closeObjects;
+	zone->getInRangeObjects(x, y, 128, &closeObjects, true, false);
 
 	PlanetManager* planetManager = zone->getPlanetManager();
 
@@ -280,8 +335,6 @@ float CollisionManager::getWorldFloorCollision(float x, float y, Zone* zone, boo
 	Vector3 rayStart(x, 16384.f, y);
 	Vector3 rayEnd(x, -16384.f, y);
 
-	Triangle* triangle = NULL;
-
 	if (testWater) {
 		float waterHeight;
 
@@ -290,43 +343,26 @@ float CollisionManager::getWorldFloorCollision(float x, float y, Zone* zone, boo
 				height = waterHeight;
 	}
 
-	float intersectionDistance;
+	for (const auto& entry : closeObjects) {
+		SceneObject* sceno = static_cast<SceneObject*>(entry);
 
-	for (int i = 0; i < closeObjects.size(); ++i) {
-		BuildingObject* building = dynamic_cast<BuildingObject*>(closeObjects.get(i).get());
+		const AppearanceTemplate* app = getCollisionAppearance(sceno, 255);
 
-		if (building == NULL)
+		if (app != NULL) {
+			Ray ray = convertToModelSpace(rayStart, rayEnd, sceno);
+
+			IntersectionResults results;
+
+			app->intersects(ray, 16384 * 2, results);
+
+			if (results.size()) { // results are ordered based on intersection distance from min to max
+				float floorHeight = 16384.f - results.getUnsafe(0).getIntersectionDistance();
+
+				if (floorHeight > height)
+					height = floorHeight;
+			}
+		} else {
 			continue;
-
-		//building->getObjectTemplate()->get
-
-		SharedObjectTemplate* templateObject = building->getObjectTemplate();
-
-		if (templateObject == NULL)
-			continue;
-
-		PortalLayout* portalLayout = templateObject->getPortalLayout();
-
-		if (portalLayout == NULL)
-			continue;
-
-		if (portalLayout->getFloorMeshNumber() == 0)
-			continue;
-
-		//find nearest entrance
-		FloorMesh* exteriorFloorMesh = portalLayout->getFloorMesh(0); // get outside layout
-		AABBTree* aabbTree = exteriorFloorMesh->getAABBTree();
-
-		if (aabbTree == NULL)
-			continue;
-
-		Ray ray = convertToModelSpace(rayStart, rayEnd, building);
-
-		if (aabbTree->intersects(ray, 16384 * 2, intersectionDistance, triangle, true)) {
-			float floorHeight = 16384 - intersectionDistance;
-
-			if (floorHeight > height)
-				height = floorHeight;
 		}
 	}
 
@@ -336,7 +372,7 @@ float CollisionManager::getWorldFloorCollision(float x, float y, Zone* zone, boo
 void CollisionManager::getWorldFloorCollisions(float x, float y, Zone* zone, SortedVector<IntersectionResult>* result, CloseObjectsVector* closeObjectsVector) {
 	if (closeObjectsVector != NULL) {
 		Vector<QuadTreeEntry*> closeObjects(closeObjectsVector->size(), 10);
-		closeObjectsVector->safeCopyTo(closeObjects);
+		closeObjectsVector->safeCopyReceiversTo(closeObjects, CloseObjectsVector::COLLIDABLETYPE);
 
 		getWorldFloorCollisions(x, y, zone, result, closeObjects);
 	} else {
@@ -433,7 +469,7 @@ bool CollisionManager::checkLineOfSight(SceneObject* object1, SceneObject* objec
 		closeObjectsNonReference = new SortedVector<QuadTreeEntry* >();
 
 		CloseObjectsVector* vec = (CloseObjectsVector*) object1->getCloseObjects();
-		vec->safeCopyTo(*closeObjectsNonReference.get());
+		vec->safeCopyReceiversTo(*closeObjectsNonReference.get(), CloseObjectsVector::COLLIDABLETYPE);
 	}
 
 	if (object1->isCreatureObject())
@@ -534,13 +570,13 @@ TriangleNode* CollisionManager::getTriangle(const Vector3& point, FloorMesh* flo
 
 	aabbTree->intersects(ray, 4, intersectionDistance, triangle, true);
 
-	TriangleNode* triangleNode = dynamic_cast<TriangleNode*>(triangle);
-
-	if (triangleNode == NULL) {
+	if (triangle == NULL) {
 		//System::out << "CollisionManager::getTriangle triangleNode NULL" << endl;
 
 		return floor->findNearestTriangle(rayOrigin);
 	}
+
+	TriangleNode* triangleNode = static_cast<TriangleNode*>(triangle);
 
 	return triangleNode;
 }
@@ -616,7 +652,7 @@ bool CollisionManager::checkShipCollision(ShipObject* ship, const Vector3& targe
 		float waterHeight = -16368.f;
 
 		if (terrainManager->getWaterHeight(targetPosition.getY(), targetPosition.getY(), waterHeight))
-			height = MAX(waterHeight, height);
+			height = Math::max(waterHeight, height);
 
 		if (height > targetPosition.getZ()) {
 			collisionPoint = targetPosition;
@@ -638,7 +674,7 @@ bool CollisionManager::checkShipCollision(ShipObject* ship, const Vector3& targe
 	Triangle* triangle = NULL;
 
 	SortedVector<ManagedReference<QuadTreeEntry*> > objects(512, 512);
-	zone->getInRangeObjects(targetPosition.getX(), targetPosition.getY(), 512, &objects, true);
+	zone->getInRangeObjects(targetPosition.getX(), targetPosition.getY(), 512, &objects, true, false);
 
 	for (int i = 0; i < objects.size(); ++i) {
 		const AppearanceTemplate *app = NULL;

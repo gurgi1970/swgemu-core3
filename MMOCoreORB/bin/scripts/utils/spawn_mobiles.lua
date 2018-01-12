@@ -234,6 +234,10 @@ function SpawnMobiles.getSpawnedMobilePointersList(pSceneObject, prefix)
 			mobile = -1
 		else
 			mobile = getSceneObject(mobileID)
+			
+			if (mobile == nil) then
+				mobile = -1
+			end
 		end
 
 		spawnedMobiles[i] = mobile
@@ -302,6 +306,7 @@ function SpawnMobiles.spawnMobiles(pSceneObject, prefix, mobileList, forceSpawn)
 	if SpawnMobiles.isPrefixFree(pSceneObject, prefix) then
 		return SpawnMobiles.spawnMobilesWithPrefix(pSceneObject, prefix, mobileList, forceSpawn)
 	else
+		printLuaError("SpawnMobiles.spawnMobiles prefix " .. prefix .. " not free (playerID " .. SceneObject(pSceneObject):getObjectID() .. ")")
 		return nil
 	end
 end
@@ -335,7 +340,7 @@ function SpawnMobiles.isFromSpawn(pSceneObject, prefix, pMobile)
 
 	if spawnedMobiles ~= nil then
 		for i = 1, #spawnedMobiles, 1 do
-			if objectIdToCheck == SceneObject(spawnedMobiles[i]):getObjectID() then
+			if SpawnMobiles.isValidMobile(spawnedMobiles[i]) and objectIdToCheck == SceneObject(spawnedMobiles[i]):getObjectID() then
 				return true
 			end
 		end

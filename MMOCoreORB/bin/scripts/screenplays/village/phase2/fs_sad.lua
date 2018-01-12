@@ -2,8 +2,7 @@ local ObjectManager = require("managers.object.object_manager")
 local QuestManager = require("managers.quest.quest_manager")
 
 FsSad = ScreenPlay:new {
-	--timePeriod = 24 * 60 * 60, -- 24 Hours
-	timePeriod = 1 * 60 * 60, -- 1 hour for testing
+	timePeriod = 24 * 60 * 60, -- 24 Hours
 	tasksPerPeriod = 3,
 	theaterTable = { FsSad1Theater1, FsSad1Theater2, FsSad1Theater3, FsSad1Theater4, FsSad1Theater5, FsSad1Theater6, FsSad1Theater7, FsSad1Theater8 }
 }
@@ -52,10 +51,18 @@ end
 function FsSad:despawnCamp(pPlayer)
 	local curQuest = -1
 	for i = 1, 8, 1 do
-		local questID = getPlayerQuestID("fs_quests_sad_task" .. i)
+		for j = 1, 2, 1 do
+			local questID
 
-		if QuestManager.hasActiveQuest(pPlayer, questID) then
-			curQuest = i
+			if (j == 1) then
+				questID = getPlayerQuestID("fs_quests_sad_task" .. i)
+			else
+				questID = getPlayerQuestID("fs_quests_sad_return" .. i)
+			end
+
+			if QuestManager.hasActiveQuest(pPlayer, questID) then
+				curQuest = i
+			end
 		end
 	end
 
@@ -68,6 +75,8 @@ function FsSad:despawnCamp(pPlayer)
 	if (FsSadTheater:hasTaskStarted(pPlayer)) then
 		FsSadTheater:finish(pPlayer)
 	end
+
+	SuiRadiationSensor:unsetLocation(pPlayer)
 end
 
 function FsSad:recreateCampIfDespawned(pPlayer)
@@ -104,7 +113,7 @@ function FsSad:acceptNextTask(pPlayer)
 
 	if (not QuestManager.hasCompletedQuest(pPlayer, QuestManager.quests.FS_QUESTS_SAD_TASKS) and not QuestManager.hasActiveQuest(pPlayer, QuestManager.quests.FS_QUESTS_SAD_TASKS)) then
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.FS_QUESTS_SAD_TASKS)
-		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE2_DAGEERIN)
 
 		if (not SuiRadiationSensor:hasSensor(pPlayer)) then
 			SuiRadiationSensor:giveSensor(pPlayer)
@@ -112,6 +121,8 @@ function FsSad:acceptNextTask(pPlayer)
 
 		self:startTask(pPlayer, QuestManager.quests.FS_QUESTS_SAD_TASK1, 1)
 	else
+		self:despawnCamp(pPlayer)
+
 		for i = 1, 8, 1 do
 			local questID = getPlayerQuestID("fs_quests_sad_return" .. i)
 

@@ -6,7 +6,7 @@ villageSivarraPhase1ConvoHandler = conv_handler:new {}
 function villageSivarraPhase1ConvoHandler:getInitialScreen(pPlayer, pNpc, pConvTemplate)
 	local convoTemplate = LuaConversationTemplate(pConvTemplate)
 
-	if (VillageJediManagerTownship:getCurrentPhase() ~= 1) then
+	if (VillageJediManagerTownship:getCurrentPhase() ~= 1 or not VillageJediManagerCommon.isVillageEligible(pPlayer)) then
 		return convoTemplate:getScreen("intro_cant_talk")
 	elseif (QuestManager.hasCompletedQuest(pPlayer, QuestManager.quests.FS_MEDIC_PUZZLE_QUEST_FINISH)) then
 		return convoTemplate:getScreen("intro_did_all_sets")
@@ -37,7 +37,7 @@ function villageSivarraPhase1ConvoHandler:getInitialScreen(pPlayer, pNpc, pConvT
 	elseif (not QuestManager.hasActiveQuest(pPlayer, QuestManager.quests.FS_MEDIC_PUZZLE_QUEST_02) and
 		QuestManager.hasCompletedQuest(pPlayer, QuestManager.quests.FS_MEDIC_PUZZLE_QUEST_01)) then
 		return convoTemplate:getScreen("intro_start_second_set")
-	elseif (VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)) then
+	elseif (VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer) or VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer)) then
 		return convoTemplate:getScreen("intro_has_another_quest")
 	else
 		return convoTemplate:getScreen("intro")
@@ -54,7 +54,7 @@ function villageSivarraPhase1ConvoHandler:runScreenHandlers(pConvTemplate, pPlay
 		QuestManager.setCurrentQuestID(pPlayer, QuestManager.quests.FS_MEDIC_PUZZLE_QUEST_01)
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.FS_MEDIC_PUZZLE_QUEST_01)
 		FsMedicPuzzle:setCuredVillagerCount(pPlayer, 0)
-		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE1_SIVARRA)
 
 		local pGhost = CreatureObject(pPlayer):getPlayerObject()
 

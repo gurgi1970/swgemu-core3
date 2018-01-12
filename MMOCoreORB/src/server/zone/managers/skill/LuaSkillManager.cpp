@@ -9,6 +9,7 @@ Luna<LuaSkillManager>::RegType LuaSkillManager::Register[] = {
 		{ "fulfillsSkillPrerequisites", &LuaSkillManager::fulfillsSkillPrerequisites },
 		{ "getSkill", &LuaSkillManager::getSkill },
 		{ "awardSkill", &LuaSkillManager::awardSkill },
+		{ "canLearnSkill", &LuaSkillManager::canLearnSkill },
 		{ 0, 0 }
 };
 
@@ -51,15 +52,38 @@ int LuaSkillManager::fulfillsSkillPrerequisites(lua_State* L) {
 	return 1;
 }
 
+int LuaSkillManager::canLearnSkill(lua_State* L) {
+	if (lua_gettop(L) - 1 != 3) {
+		Logger::console.error("incorrect number of arguments for LuaSkillManager::canLearnSkill");
+		return 0;
+	}
+
+	bool xpReq = lua_toboolean(L, -1);
+	String skillName = lua_tostring(L, -2);
+	CreatureObject* creo = (CreatureObject*) lua_touserdata(L, -3);
+
+	bool canLearn = realObject->canLearnSkill(skillName, creo, xpReq);
+
+	lua_pushboolean(L, canLearn);
+
+	return 1;
+}
+
 int LuaSkillManager::getSkill(lua_State* L) {
 	if (lua_gettop(L) - 1 != 1) {
 		Logger::console.error("incorrect number of arguments for LuaSkillManager::getSkill");
 		return 0;
 	}
 
-	String skillName = lua_tostring(L, -1);
+	auto skillName = lua_tostring(L, -1);
 
-	lua_pushlightuserdata(L, realObject->getSkill(skillName));
+	if (skillName == nullptr) {
+		Logger::console.error("null skill name passed to LuaSkillManager::getSkill");
+
+		return 0;
+	} else {
+		lua_pushlightuserdata(L, realObject->getSkill(skillName));
+	}
 
 	return 1;
 }

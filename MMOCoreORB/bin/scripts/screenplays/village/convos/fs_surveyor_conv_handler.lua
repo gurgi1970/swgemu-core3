@@ -23,7 +23,7 @@ function villageSurveyorConvoHandler:getInitialScreen(pPlayer, pNpc, pConvTempla
 		return convoTemplate:getScreen("intro_in_progress")
 	end
 
-	if (VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)) then
+	if (VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer) or VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer)) then
 		return convoTemplate:getScreen("intro_has_other_quest")
 	else
 		return convoTemplate:getScreen("intro")
@@ -55,12 +55,12 @@ function villageSurveyorConvoHandler:runScreenHandlers(pConvTemplate, pPlayer, p
 	elseif (screenID == "sample_phase_2") then
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.SURVEY_PHASE2_MAIN)
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.SURVEY_PHASE2_01)
-		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE2_SURVEYOR)
 		createObserver(SAMPLE, "FsSurvey", "sampleEventHandler", pPlayer, 1)
 	elseif (screenID == "sample_phase_3") then
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.SURVEY_PHASE3_MAIN)
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.SURVEY_PHASE3_01)
-		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE3_SURVEYOR)
 		createObserver(SAMPLE, "FsSurvey", "sampleEventHandler", pPlayer, 1)
 	end
 

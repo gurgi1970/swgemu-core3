@@ -15,6 +15,10 @@ FsCrafting4 = {
 }
 
 function FsCrafting4:activateQuest(pPlayer)
+	if (VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)) then
+		return
+	end
+
 	local lastCompleted = self:getLastCompletedQuest(pPlayer)
 
 	if (lastCompleted >  -1) then
@@ -29,7 +33,23 @@ function FsCrafting4:activateQuest(pPlayer)
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.FS_CRAFTING4_QUEST_01)
 	end
 
-	VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+	VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE4_ENGINEER)
+end
+
+function FsCrafting4:sendTooLateSui(pPlayer)
+	if (readScreenPlayData(pPlayer, "VillageJediProgression", "FsCrafting4TooLateBox") == "1") then
+		return
+	end
+
+	local sui = SuiMessageBox.new("FsCrafting4", "noCallback")
+
+	sui.setTitle("@quest/force_sensitive/fs_crafting:crafting4_phase_change_title")
+	sui.setPrompt("@quest/force_sensitive/fs_crafting:crafting4_phase_over")
+	sui.hideCancelButton()
+
+	sui.sendTo(pPlayer)
+
+	writeScreenPlayData(pPlayer, "VillageJediProgression", "FsCrafting4TooLateBox", 1)
 end
 
 function FsCrafting4:removeCore(pPlayer)
@@ -45,6 +65,8 @@ function FsCrafting4:removeCore(pPlayer)
 		SceneObject(pCore):destroyObjectFromWorld()
 		SceneObject(pCore):destroyObjectFromDatabase()
 	end
+
+	deleteScreenPlayData(pPlayer, "VillageJediProgression", "FsCrafting4TooLateBox")
 end
 
 function FsCrafting4:getActiveQuestNum(pPlayer)
@@ -502,14 +524,18 @@ function FsCrafting4ComputerCoreMenuComponent:attemptConfigure(pCore, pPlayer)
 		QuestManager.completeQuest(pPlayer, QuestManager.quests.FS_CRAFTING4_QUEST_05)
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.FS_CRAFTING4_QUEST_06)
 
-		local sui = SuiMessageBox.new("FsCrafting4", "noCallback")
+		if (VillageJediManagerTownship:getCurrentPhase() == 4) then
+			local sui = SuiMessageBox.new("FsCrafting4", "noCallback")
 
-		sui.setProperty("", "Size", "500,250")
-		sui.setTitle("@quest/force_sensitive/fs_crafting:crafting4_core_menu_status")
-		sui.setPrompt("@quest/force_sensitive/fs_crafting:crafting4_core_completed_status")
-		sui.hideCancelButton()
+			sui.setProperty("", "Size", "500,250")
+			sui.setTitle("@quest/force_sensitive/fs_crafting:crafting4_core_menu_status")
+			sui.setPrompt("@quest/force_sensitive/fs_crafting:crafting4_core_completed")
+			sui.hideCancelButton()
 
-		sui.sendTo(pPlayer)
+			sui.sendTo(pPlayer)
+		else
+			FsCrafting4:sendTooLateSui(pPlayer)
+		end
 		TangibleObject(pCore):setLuaStringData("correctlyConfigured", "true")
 	else
 		local correctWiresUsed = 0

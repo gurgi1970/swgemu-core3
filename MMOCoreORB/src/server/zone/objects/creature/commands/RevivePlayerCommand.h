@@ -206,9 +206,9 @@ public:
 		if (!canPerformSkill(creature, creatureTarget, revivePack, mindCostNew))
 			return 0;
 
-		int healthToHeal = MAX(1, (int) round(revivePack->getHealthHealed()));
-		int actionToHeal = MAX(1, (int) round(revivePack->getActionHealed()));
-		int mindToHeal = MAX(1, (int) round(revivePack->getMindHealed()));
+		int healthToHeal = Math::max(1, (int) round(revivePack->getHealthHealed()));
+		int actionToHeal = Math::max(1, (int) round(revivePack->getActionHealed()));
+		int mindToHeal = Math::max(1, (int) round(revivePack->getMindHealed()));
 
 		int healedHealth = creatureTarget->healDamage(creature, CreatureAttribute::HEALTH, healthToHeal);
 		int healedAction = creatureTarget->healDamage(creature, CreatureAttribute::ACTION, actionToHeal);
@@ -239,6 +239,8 @@ public:
 		checkForTef(creature, creatureTarget);
 
 		applyDebuff(creatureTarget);
+
+		creatureTarget->notifyObservers(ObserverEventType::CREATUREREVIVED, creature, 0);
 
 		return SUCCESS;
 	}

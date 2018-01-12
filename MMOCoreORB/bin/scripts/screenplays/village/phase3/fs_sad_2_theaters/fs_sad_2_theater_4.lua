@@ -9,7 +9,7 @@ FsSad2Theater4 = GoToTheater:new {
 	taskName = "FsSad2Theater4",
 	-- GoToTheater properties
 	minimumDistance = 800,
-	maximumDistance = 1200,
+	maximumDistance = 2000,
 	theater = {
 		{ template = "object/static/structure/dathomir/mtn_clan_hut_s01.iff", xDiff = 0.896, zDiff = 0.236, yDiff = -0.2725, heading = 0 },
 		{ template = "object/static/structure/general/camp_campfire_logs_smoldering_s01.iff", xDiff = 0.089, zDiff = 0.008, yDiff = 0.682, heading = -16.464 },
@@ -27,8 +27,8 @@ FsSad2Theater4 = GoToTheater:new {
 		{ template = "sith_shadow_outlaw", minimumDistance = 7, maximumDistance = 12, referencePoint = 0 },
 	},
 	createWaypoint = false,
-	despawnTime = 20 * 60 * 1000, -- 20 minutes
 	activeAreaRadius = 16,
+	flattenLayer = true
 }
 
 function FsSad2Theater4:onObjectsSpawned(pPlayer, spawnedMobileList)

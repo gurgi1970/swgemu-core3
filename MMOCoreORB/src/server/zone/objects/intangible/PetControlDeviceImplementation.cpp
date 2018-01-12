@@ -270,9 +270,19 @@ int PetControlDeviceImplementation::handleObjectMenuSelect(CreatureObject* playe
 			error("null controlled object in pet control device");
 			return 1;
 		} else {
-			Locker crossLocker(pet, player);
+			Reference<AiAgent*> petReference = pet;
+			Reference<CreatureObject*> playerReference = player;
+			Reference<PetControlDevice*> thisReference = _this.getReferenceUnsafeStaticCast();
 
-			callObject(player);
+			Core::getTaskManager()->executeTask([thisReference, petReference, playerReference] () {
+				Locker locker(playerReference);
+
+				Locker crossLocker(petReference, playerReference);
+
+				Locker controlLocker(thisReference);
+
+				thisReference->callObject(playerReference);
+			}, "ControlDeviceCallLambda");
 		}
 	} else if (selectedID == 59) {
 		if (pet == NULL) {
@@ -280,13 +290,33 @@ int PetControlDeviceImplementation::handleObjectMenuSelect(CreatureObject* playe
 			return 1;
 		} else {
 			if (status == 1 && !ghost->hasActivePet(pet)) {
-				Locker crossLocker(pet, player);
+				Reference<AiAgent*> petReference = pet;
+				Reference<CreatureObject*> playerReference = player;
+				Reference<PetControlDevice*> thisReference = _this.getReferenceUnsafeStaticCast();
 
-				callObject(player);
+				Core::getTaskManager()->executeTask([thisReference, petReference, playerReference] () {
+					Locker locker(playerReference);
+
+					Locker crossLocker(petReference, playerReference);
+
+					Locker controlLocker(thisReference);
+
+					thisReference->callObject(playerReference);
+				}, "ControlDeviceCallLambda2");
 			} else {
-				Locker crossLocker(pet, player);
+				Reference<AiAgent*> petReference = pet;
+				Reference<CreatureObject*> playerReference = player;
+				Reference<PetControlDevice*> thisReference = _this.getReferenceUnsafeStaticCast();
 
-				storeObject(player);
+				Core::getTaskManager()->executeTask([thisReference, petReference, playerReference] () {
+					Locker locker(playerReference);
+
+					Locker crossLocker(petReference, playerReference);
+
+					Locker controlLocker(thisReference);
+
+					thisReference->storeObject(playerReference);
+				}, "ControlDeviceStoreLambda");
 			}
 		}
 	}
@@ -424,7 +454,7 @@ void PetControlDeviceImplementation::storeObject(CreatureObject* player, bool fo
 
 	assert(pet->isLockedByCurrentThread());
 
-	if (!force && (pet->isInCombat() || player->isInCombat()))
+	if (!force && (pet->isInCombat() || player->isInCombat() || player->isDead()))
 		return;
 
 	if (player->isRidingMount() && player->getParent() == pet) {
@@ -438,11 +468,11 @@ void PetControlDeviceImplementation::storeObject(CreatureObject* player, bool fo
 			return;
 	}
 
-	if( player->getCooldownTimerMap() == NULL )
+	if (player->getCooldownTimerMap() == NULL)
 		return;
 
 	// Check cooldown
-	if( !player->getCooldownTimerMap()->isPast("petCallOrStoreCooldown") && !force ){
+	if (!player->getCooldownTimerMap()->isPast("petCallOrStoreCooldown") && !force) {
 		player->sendSystemMessage("@pet/pet_menu:cant_store_1sec"); //"You cannot STORE for 1 second."
 		return;
 	}
@@ -456,15 +486,15 @@ void PetControlDeviceImplementation::storeObject(CreatureObject* player, bool fo
 	Reference<StorePetTask*> task = new StorePetTask(player, pet);
 
 	// Store non-faction pets immediately.  Store faction pets after 60sec delay.
-	if( petType != PetManager::FACTIONPET || force || player->getPlayerObject()->isPrivileged()){
+	if (petType != PetManager::FACTIONPET || force || player->getPlayerObject()->isPrivileged()) {
 		task->execute();
 	}
-	else{
-		if(pet->getPendingTask("store_pet") == NULL) {
+	else {
+		if (pet->getPendingTask("store_pet") == NULL) {
 			player->sendSystemMessage( "Storing pet in 60 seconds");
 			pet->addPendingTask("store_pet", task, 60 * 1000);
 		}
-		else{
+		else {
 			Time nextExecution;
 			Core::getTaskManager()->getNextExecutionTime(pet->getPendingTask("store_pet"), nextExecution);
 			int timeLeft = (nextExecution.getMiliTime() / 1000) - System::getTime();
@@ -1179,12 +1209,8 @@ void PetControlDeviceImplementation::setVitality(int vit) {
 	vitality = vit;
 
 	if (petType == PetManager::CREATUREPET || petType == PetManager::DROIDPET) {
-		ManagedReference<TangibleObject*> controlledObject = this->controlledObject.get();
-		if (controlledObject == NULL || !controlledObject->isCreatureObject())
-			return;
-
-		CreatureObject* pet = cast<CreatureObject*>(controlledObject.get());
-		if (pet == NULL )
+		ManagedReference<CreatureObject*> pet = this->controlledObject.get().castTo<CreatureObject*>();
+		if (controlledObject == NULL)
 			return;
 
 		float hamPenaltyModifier = 0;
@@ -1198,26 +1224,37 @@ void PetControlDeviceImplementation::setVitality(int vit) {
 			hamPenaltyModifier = 0.75f;
 		}
 
-		int newVitalityHealthPenalty = pet->getBaseHAM(0) * hamPenaltyModifier;
-		int newVitalityActionPenalty = pet->getBaseHAM(3) * hamPenaltyModifier;
-		int newVitalityMindPenalty = pet->getBaseHAM(6) * hamPenaltyModifier;
+		Reference<PetControlDevice*> petControlDevice = _this.getReferenceUnsafeStaticCast();
 
-		if (newVitalityHealthPenalty != vitalityHealthPenalty) {
-			int change = vitalityHealthPenalty - newVitalityHealthPenalty;
-			pet->setMaxHAM(0, pet->getMaxHAM(0) + change, true);
-			vitalityHealthPenalty = newVitalityHealthPenalty;
-		}
+		float vitalityMindPenalty = this->vitalityMindPenalty;
+		float vitalityActionPenalty = this->vitalityActionPenalty;
+		float vitalityHealthPenalty	= this->vitalityHealthPenalty;
 
-		if (newVitalityActionPenalty != vitalityActionPenalty) {
-			int change = vitalityActionPenalty - newVitalityActionPenalty;
-			pet->setMaxHAM(3, pet->getMaxHAM(3) + change, true);
-			vitalityActionPenalty = newVitalityActionPenalty;
-		}
+		Core::getTaskManager()->executeTask([pet, petControlDevice, hamPenaltyModifier, vitalityMindPenalty, vitalityActionPenalty, vitalityHealthPenalty] () {
+			Locker locker(pet);
 
-		if (newVitalityMindPenalty != vitalityMindPenalty) {
-			int change = vitalityMindPenalty - newVitalityMindPenalty;
-			pet->setMaxHAM(6, pet->getMaxHAM(6) + change, true);
-			vitalityMindPenalty = newVitalityMindPenalty;
-		}
+			Locker clocker(petControlDevice, pet);
+
+			int newVitalityHealthPenalty = pet->getBaseHAM(0) * hamPenaltyModifier;
+			int newVitalityActionPenalty = pet->getBaseHAM(3) * hamPenaltyModifier;
+			int newVitalityMindPenalty = pet->getBaseHAM(6) * hamPenaltyModifier;
+
+			if (newVitalityHealthPenalty != vitalityHealthPenalty) {
+				int change = vitalityHealthPenalty - newVitalityHealthPenalty;
+				petControlDevice->setVitalityHealthPenalty(newVitalityHealthPenalty);
+			}
+
+			if (newVitalityActionPenalty != vitalityActionPenalty) {
+				int change = vitalityActionPenalty - newVitalityActionPenalty;
+				pet->setMaxHAM(3, pet->getMaxHAM(3) + change, true);
+				petControlDevice->setVitalityActionPenalty(newVitalityActionPenalty);
+			}
+
+			if (newVitalityMindPenalty != vitalityMindPenalty) {
+				int change = vitalityMindPenalty - newVitalityMindPenalty;
+				pet->setMaxHAM(6, pet->getMaxHAM(6) + change, true);
+				petControlDevice->setVitalityMindPenalty(newVitalityMindPenalty);
+			}
+		}, "PetSetVitalityLambda");
 	}
 }

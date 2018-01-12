@@ -8,7 +8,7 @@ FsOutro = ScreenPlay:new {
 	FORCESHRINE = 4,
 
 	stepDelay = {
-		[1] = { 300, 600 }, -- Old man visit, 5-10 mins for testing
+		[1] = { 15600, 86400 }, -- Old man visit, 1 hour to 1 day
 	}
 }
 
@@ -32,13 +32,13 @@ function FsOutro:isOnOutro(pPlayer)
 end
 
 function FsOutro:hasDelayPassed(pPlayer)
-	local stepDelay = readScreenPlayData(pPlayer, "VillageJediProgression", "FsOutroDelay")
+	local stepDelay = tonumber(readScreenPlayData(pPlayer, "VillageJediProgression", "FsOutroDelay"))
 
-	if (stepDelay == "") then
+	if (stepDelay == nil or stepDelay == 0) then
 		return true
 	end
-
-	return tonumber(stepDelay) >= os.time()
+	
+	return os.time() >= stepDelay
 end
 
 function FsOutro:onLoggedIn(pPlayer)
@@ -50,12 +50,12 @@ function FsOutro:onLoggedIn(pPlayer)
 
 	if (curStep == self.OLDMANWAIT) then
 		if (self:hasDelayPassed(pPlayer)) then
-			createEvent(getRandomNumber(300, 900) * 1000, "FsOutro", "startOldMan", pPlayer, "")
-			self:setCurrentStep(pPlayer, curStep + 1)
+			createEvent(getRandomNumber(300, 900) * 1000, "FsOutro", "doOldManSpawn", pPlayer, "")
 		end
 	elseif (curStep == self.OLDMANMEET) then
 		QuestManager.resetQuest(pPlayer, QuestManager.quests.OLD_MAN_FINAL)
-		createEvent(getRandomNumber(300, 900) * 1000, "FsOutro", "startOldMan", pPlayer, "")
+		createEvent(getRandomNumber(300, 900) * 1000, "FsOutro", "doOldManSpawn", pPlayer, "")
+		self:setCurrentStep(pPlayer, self.OLDMANWAIT)
 	elseif (curStep == self.MELLICHAETHEATER) then
 		if (MellichaeOutroTheater:hasTaskStarted(pPlayer)) then
 			MellichaeOutroTheater:finish(pPlayer)
@@ -69,23 +69,22 @@ end
 function FsOutro:startOldMan(pPlayer)
 	local curStep = self:getCurrentStep(pPlayer)
 
-	if (curStep ~= self.OLDMANMEET) then
+	if (curStep ~= self.OLDMANWAIT) then
 		return
 	end
 
 	local stepData = self.stepDelay[self.OLDMANWAIT]
-
+	
 	if (stepData == nil) then
 		printLuaError("FsOutro:startOldMan, invalid step data.")
 		return
 	end
 
-	self:setCurrentStep(pPlayer, self.OLDMANWAIT)
-	local stepDelay = getRandomNumber(stepData[1], stepData[2]) * 1000
+	local stepDelay = getRandomNumber(stepData[1], stepData[2])
 
 	QuestManager.resetQuest(pPlayer, QuestManager.quests.OLD_MAN_FINAL)
-	writeScreenPlayData(pPlayer, "VillageJediProgression", "FsOutroStepDelay", stepDelay + os.time())
-	createEvent(stepDelay, "FsOutro", "doOldManSpawn", pPlayer, "")
+	writeScreenPlayData(pPlayer, "VillageJediProgression", "FsOutroDelay", stepDelay + os.time())
+	createEvent(stepDelay * 1000, "FsOutro", "doOldManSpawn", pPlayer, "")
 end
 
 function FsOutro:onLoggedOut(pPlayer)
@@ -107,7 +106,7 @@ function FsOutro:doOldManSpawn(pPlayer)
 
 	local curStep = self:getCurrentStep(pPlayer)
 
-	if (curStep ~= self.OLDMANMEET) then
+	if (curStep == self.OLDMANMEET) then
 		return
 	end
 
@@ -128,4 +127,23 @@ function FsOutro:doOldManSpawn(pPlayer)
 		createEvent(getRandomNumber(300, 900) * 1000, "FsOutro", "doOldManSpawn", pPlayer, "")
 		return
 	end
+end
+
+function FsOutro:completeVillageOutroFrog(pPlayer)
+	if (pPlayer == nil) then
+		return
+	end
+
+	local pGhost = CreatureObject(pPlayer):getPlayerObject()
+
+	if (pGhost == nil) then
+		return
+	end
+
+	QuestManager.completeQuest(pPlayer, QuestManager.quests.OLD_MAN_FINAL)
+	QuestManager.completeQuest(pPlayer, QuestManager.quests.FS_THEATER_FINAL)
+
+	VillageJediManagerCommon.setJediProgressionScreenPlayState(pPlayer, VILLAGE_JEDI_PROGRESSION_DEFEATED_MELLIACHAE)
+
+	PadawanTrials:doPadawanTrialsSetup(pPlayer)
 end

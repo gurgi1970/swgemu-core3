@@ -1,43 +1,43 @@
 --Copyright (C) 2007 <SWGEmu>
- 
+
 --This File is part of Core3.
- 
---This program is free software; you can redistribute 
---it and/or modify it under the terms of the GNU Lesser 
+
+--This program is free software; you can redistribute
+--it and/or modify it under the terms of the GNU Lesser
 --General Public License as published by the Free Software
---Foundation; either version 2 of the License, 
+--Foundation; either version 2 of the License,
 --or (at your option) any later version.
- 
---This program is distributed in the hope that it will be useful, 
---but WITHOUT ANY WARRANTY; without even the implied warranty of 
---MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+
+--This program is distributed in the hope that it will be useful,
+--but WITHOUT ANY WARRANTY; without even the implied warranty of
+--MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 --See the GNU Lesser General Public License for
 --more details.
- 
---You should have received a copy of the GNU Lesser General 
+
+--You should have received a copy of the GNU Lesser General
 --Public License along with this program; if not, write to
 --the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
- 
---Linking Engine3 statically or dynamically with other modules 
---is making a combined work based on Engine3. 
---Thus, the terms and conditions of the GNU Lesser General Public License 
+
+--Linking Engine3 statically or dynamically with other modules
+--is making a combined work based on Engine3.
+--Thus, the terms and conditions of the GNU Lesser General Public License
 --cover the whole combination.
- 
---In addition, as a special exception, the copyright holders of Engine3 
---give you permission to combine Engine3 program with free software 
---programs or libraries that are released under the GNU LGPL and with 
---code included in the standard release of Core3 under the GNU LGPL 
---license (or modified versions of such code, with unchanged license). 
---You may copy and distribute such a system following the terms of the 
---GNU LGPL for Engine3 and the licenses of the other code concerned, 
---provided that you include the source code of that other code when 
+
+--In addition, as a special exception, the copyright holders of Engine3
+--give you permission to combine Engine3 program with free software
+--programs or libraries that are released under the GNU LGPL and with
+--code included in the standard release of Core3 under the GNU LGPL
+--license (or modified versions of such code, with unchanged license).
+--You may copy and distribute such a system following the terms of the
+--GNU LGPL for Engine3 and the licenses of the other code concerned,
+--provided that you include the source code of that other code when
 --and as the GNU LGPL requires distribution of source code.
- 
---Note that people who make modified versions of Engine3 are not obligated 
---to grant this special exception for their modified versions; 
---it is their choice whether to do so. The GNU Lesser General Public License 
---gives permission to release a modified version without this exception; 
---this exception also makes it possible to release a modified version 
+
+--Note that people who make modified versions of Engine3 are not obligated
+--to grant this special exception for their modified versions;
+--it is their choice whether to do so. The GNU Lesser General Public License
+--gives permission to release a modified version without this exception;
+--this exception also makes it possible to release a modified version
 --which carries forward this exception.
 
 --Time, in seconds, that a shuttle is away for
@@ -54,9 +54,10 @@ starportLandedTime = 120
 
 
 corellia = {
-
 	weatherEnabled = 1,
 	gcwEnabled = 1,
+
+	outpostRegionNames = { },
 
 	planetTravelPoints = {
 		{name = "Coronet Shuttle B", x = -329.76605, z = 28, y = -4641.23, interplanetaryTravelAllowed = 0, incomingTravelAllowed = 1},
@@ -75,11 +76,11 @@ corellia = {
 	},
 
 	badgeAreas = {
-		{"badge_agrilat_swap",1387,3749,30,20},
-		{"badge_bela_vistal_fountain",6767,-5617,30,81},
-		{"badge_rebel_hideout",-6530,5967,30,78},
-		{"badge_rogue_corsec_base",5291,1494,30,79},
-		{"badge_tyrena_theater",-5418,-6248,30,80},
+		{"badge_agrilat_swap",1387,3749,0,30,20},
+		{"badge_bela_vistal_fountain",6767,-5617,0,30,81},
+		{"badge_rebel_hideout",-6530,5967,0,30,78},
+		{"badge_rogue_corsec_base",5291,1494,0,30,79},
+		{"badge_tyrena_theater",-5418,-6248,0,30,80},
 	},
 
 	navAreas = {
@@ -100,9 +101,14 @@ corellia = {
 }
 
 dantooine = {
-
 	weatherEnabled = 1,
 	gcwEnabled = 1,
+
+	outpostRegionNames = {
+		{name = "@dantooine_region_names:dantooine_mining_outpost", x = -640, y = 2486},
+		{name = "@dantooine_region_names:dantooine_pirate_outpost", x = 1588, y = -6399},
+		{name = "@dantooine_region_names:dantooine_imperial_outpost", x = -4224, y = -2400},
+	},
 
 	planetTravelPoints = {
 		{name = "Dantooine Mining Outpost", x = -635.96887, z = 3, y = 2507.0115, interplanetaryTravelAllowed = 1, incomingTravelAllowed = 1},
@@ -111,10 +117,10 @@ dantooine = {
 	},
 
 	badgeAreas = {
-		{"badge_dantari_village1",-3929,-5632,30,84},
-		{"badge_dantari_village2",-7185,-883,30,85},
-		{"badge_jedi_temple",4195,5203,30,30},
-		{"badge_rebel_base",-6836,5520,30,31},
+		{"badge_dantari_village1",-3929,-5632,0,30,84},
+		{"badge_dantari_village2",-7185,-883,0,30,85},
+		{"badge_jedi_temple",4195,5203,0,30,30},
+		{"badge_rebel_base",-6836,5520,0,30,31},
 	},
 
 	navAreas = {
@@ -124,7 +130,6 @@ dantooine = {
 		{"dantari_village_west",-7185,-861,100},
 		{"jedi_temple_ruins",4203,5222,100},
 		{"mokk_stronghold",-7046,-3332,50},
-		{"native_village",7181,887,75},
 		{"ris_armor_hut",-6805,6021,32},
 		{"the_warren",-550,-3834,50},
 	},
@@ -132,33 +137,35 @@ dantooine = {
 	planetObjects = {
 		{templateFile = "object/tangible/terminal/terminal_character_builder.iff", ox = 0, oy = 0.695864, oz = 0, ow = 0.718174, x = 1585.68, z = 4, y = -6368.95, parentid = 0},
 		{templateFile = "object/tangible/terminal/terminal_character_builder.iff", ox = 0, oy = 0.725999, oz = 0, ow = -0.687696, x = -629.417, z = 3, y = 2481.24, parentid = 0}
- 	}
+	}
 }
 
 dathomir = {
-
 	weatherEnabled = 1,
 	gcwEnabled = 1,
 
+	outpostRegionNames = { },
+
 	planetTravelPoints = {
 		{name = "Trade Outpost", x = 618.89258, z = 6.039608, y = 3092.0142, interplanetaryTravelAllowed = 1, incomingTravelAllowed = 1},
-		{name = "Science Outpost", x = -49.021923, z = 18, y = -1584.7278, interplanetaryTravelAllowed = 1, incomingTravelAllowed = 1} 
+		{name = "Science Outpost", x = -49.021923, z = 18, y = -1584.7278, interplanetaryTravelAllowed = 1, incomingTravelAllowed = 1}
 	},
 
 	badgeAreas = {
-		{"badge_crashed_ship",5676,1901,30,82},
-		{"badge_escape_pod",-4427,586,30,27},
-		{"badge_imperial_prison",-6141,973,30,83},
-		{"badge_misty_falls_1",3558,1554,30,28},
-		{"badge_misty_falls_2",3021,1289,30,29},
-		{"badge_sarlacc",-2101,3165,30,26},
-		{"badge_tarpit",652,-4888,30,25},
+		{"badge_crashed_ship",5676,1901,0,30,82},
+		{"badge_escape_pod",-4427,586,0,30,27},
+		{"badge_imperial_prison",-6141,973,0,30,83},
+		{"badge_misty_falls_1",3558,1554,0,30,28},
+		{"badge_misty_falls_2",3021,1289,0,30,29},
+		{"badge_sarlacc",-2101,3165,0,30,26},
+		{"badge_tarpit",652,-4888,0,30,25},
 	},
 
 	navAreas = {
 		{"ancient_stone_hut",3490,-395,64},
 		{"burial_site_nw",-5259,1299,32},
 		{"ceremonial_site",1072,-4485,50},
+		{"dathomir_worship_stone",-6953,-3032,32},
 		{"destroyed_rebel_base",-4705,-4772,50},
 		{"empty_hut",-6894,-4854,32},
 		{"fenced_building",50,-164,32},
@@ -185,7 +192,6 @@ dathomir = {
 		{"tower_and_stones",-443,-1156,32},
 		{"tree_hut",-5045,-2773,32},
 		{"wall",7442,-3024,32},
-		{"worship_stone",-6953,-3032,32},
 	},
 
 	planetObjects = {
@@ -196,9 +202,13 @@ dathomir = {
 }
 
 endor = {
-
 	weatherEnabled = 1,
 	gcwEnabled = 1,
+
+	outpostRegionNames = {
+		{name = "@endor_region_names:endor_smuggler_outpost", x = -905, y = 1584},
+		{name = "@endor_region_names:endor_neutral_outpost", x = 3221, y = -3471},
+	},
 
 	planetTravelPoints = {
 		{name = "Smuggler Outpost", x = -950.59241, z = 73, y = 1553.4125, interplanetaryTravelAllowed = 1, incomingTravelAllowed = 1},
@@ -206,10 +216,10 @@ endor = {
 	},
 
 	badgeAreas = {
-		{"badge_dulok_villlage",5921,-2514,30,88},
-		{"badge_ewok_tree_villlage",4661,-2425,30,86},
-		{"badge_imp_outpost",-4628,-2273,30,89},
-		{"badge_lake_villlage",1454,-3272,30,87},
+		{"badge_dulok_villlage",5921,-2514,0,30,88},
+		{"badge_ewok_tree_villlage",4661,-2425,0,30,86},
+		{"badge_imp_outpost",-4628,-2273,0,30,89},
+		{"badge_lake_villlage",1454,-3272,0,30,87},
 	},
 
 	navAreas = {
@@ -234,32 +244,34 @@ endor = {
 }
 
 lok = {
-
 	weatherEnabled = 1,
 	gcwEnabled = 1,
+
+	outpostRegionNames = {
+		{name = "@lok_region_names:lok_imperial_outpost", x = -1920, y = -3084},
+	},
 
 	planetTravelPoints = {
 		{name = "Nym's Stronghold", x = 478.92676, z = 9, y = 5511.9565, interplanetaryTravelAllowed = 1, incomingTravelAllowed = 1}
 	},
 
 	badgeAreas = {
-		{"badge_imp_outpost",-1814,-3086,10,98},
-		{"badge_kimogila_skeleton",4562,-1156,10,99},
-		{"badge_volcano",3091,-4638,10,24},
+		{"badge_imp_outpost",-1814,-3086,0,10,98},
+		{"badge_kimogila_skeleton",4562,-1156,0,10,99},
+		{"badge_volcano",3091,-4638,0,10,24},
 	},
 
 	navAreas = {
 		{"abandoned_camp",-234,-457,32},
-		{"broken_wall",-4433,-5750,32},
 		{"camp_ruins",5075,-4117,15},
 		{"canyon_corsair_stronghold",-3868,-3820,128},
 		{"downed_blood_razor_transport",3640,2178,128},
 		{"great_maze",3827,-540,50},
 		{"gurk_camp",-3763,-3477,32},
 		{"imperial_lookout",-2569,-861,32},
-		{"imperial_outpost",-1913,-3082,150},
 		{"kimogila_town",-78,2710,50},
-		{"lokkian_fountain",6399,5102,32},
+		{"lok_broken_wall",-4433,-5750,32},
+		{"lokkian_fountain",6399,5102,64},
 		{"rebel_house",-4751,3525,75},
 		{"torches_and_arches",716,-3380,32},
 	},
@@ -270,9 +282,10 @@ lok = {
 }
 
 naboo = {
-
 	weatherEnabled = 1,
 	gcwEnabled = 1,
+
+	outpostRegionNames = { },
 
 	planetTravelPoints = {
 		{name = "Keren Starport", x = 1371.5938, z = 13, y = 2747.9043, interplanetaryTravelAllowed = 1, incomingTravelAllowed = 1},
@@ -291,25 +304,25 @@ naboo = {
 	},
 
 	badgeAreas = {
-		{"badge_amidalas_sandy_beach",-5828,-93,10,77},
-		{"badge_deeja_falls_top",5161,-1627,10,76},
-		{"badge_gungan_sacred_place",-2000,-5429,10,19},
-		{"badge_theed_falls_bottom",-4614,4261,10,75},
+		{"badge_amidalas_sandy_beach",-5828,-93,0,10,77},
+		{"badge_deeja_falls_top",5161,-1627,0,10,76},
+		{"badge_gungan_sacred_place",-2000,-5429,0,10,19},
+		{"badge_theed_falls_bottom",-4614,4261,0,10,75},
 	},
 
 	navAreas = {
 		{"amidalas_beach",-5526,-31,128},
 		{"beach_gungan_ruins",7570,6968,32},
-		{"broken_wall",3485,-2882,32},
-		{"crashed_escape_pod",-2433,-2492,32},
 		{"emperors_retreat",2415,-3921,100},
 		{"fire_and_pillars",-1775,-487,32},
 		{"fishing_pond",-6312,-5086,32},
 		{"gate_and_gazebo",-258,-61,32},
 		{"gungan_ruins",0,-1866,32},
 		{"gungan_sacred_place",-1991,-5422,200},
-		{"mauler_stronghold",2912,1118,50},
 		{"imperial_outpost",-4769,-3982,32},
+		{"mauler_stronghold",2912,1118,50},
+		{"naboo_broken_wall",3485,-2882,32},
+		{"naboo_crashed_escape_pod",-2433,-2492,32},
 		{"naboo_pirate_outpost",-1496,-1728,50},
 		{"pillars",7263,-2973,32},
 		{"ruined_gate",-7324,-4149,32},
@@ -329,9 +342,12 @@ naboo = {
 }
 
 rori = {
-
 	weatherEnabled = 1,
 	gcwEnabled = 1,
+
+	outpostRegionNames = {
+		{name = "@rori_region_names:sdungeon_rebel_outpost", x = 3677, y = -6447},
+	},
 
 	planetTravelPoints = {
 		{name = "Restuss Starport", x = 5340, z = 80, y = 5734, interplanetaryTravelAllowed = 1, incomingTravelAllowed = 1},
@@ -342,15 +358,14 @@ rori = {
 	},
 
 	badgeAreas = {
-		{"badge_imp_camp",-5633,-5661,10,96},
-		{"badge_imp_hyperdrive_fac",-1130,4544,10,97},
-		{"badge_kobala_spice_mine",7304,63,10,94},
-		{"badge_rebel_outpost",3664,-6501,10,95}
+		{"badge_imp_camp",-5633,-5661,0,10,96},
+		{"badge_imp_hyperdrive_fac",-1130,4544,0,10,97},
+		{"badge_kobala_spice_mine",7304,63,0,10,94},
+		{"badge_rebel_outpost",3664,-6501,0,10,95}
 	},
 
 	navAreas = {
 		{"4_columns",-432,3264,32},
-		{"bounty_hunter_camp",-3650,5531,32},
 		{"cobral_tent",-4972,-670,32},
 		{"crashed_corvette",0,2012,50},
 		{"crashed_escape_pod_east",4272,2509,32},
@@ -378,8 +393,10 @@ rori = {
 		{"rorgungan_ruins_sw",-6967,-5642,32},
 		{"rorgungan_shield",-5507,2096,32},
 		{"rorgungan_swamp_town",-2069,3301,100},
+		{"rori_bounty_hunter_camp",-3650,5531,32},
+		{"rori_ruins_east",5584,2436,32},
+		{"rori_sunken_ruins",5961,-2598,32},
 		{"ruined_outpost",5083,4676,32},
-		{"ruins_east",5584,2436,32},
 		{"ruins_ne",6684,6882,32},
 		{"ruins_north",958,6521,32},
 		{"ruins_nw_1",-4706,3580,32},
@@ -392,7 +409,6 @@ rori = {
 		{"statue_head_north_1",1116,3833,32},
 		{"statue_head_north_2",961,4493,32},
 		{"statue_head_west",-2140,614,32},
-		{"sunken_ruins",5961,-2598,32},
 		{"wall_1",959,5080,64},
 		{"wall_2",-1230,-3207,64},
 	},
@@ -405,9 +421,12 @@ rori = {
 }
 
 talus = {
-
 	weatherEnabled = 1,
 	gcwEnabled = 1,
+
+	outpostRegionNames = {
+		{name = "@talus_region_names:talus_imperial_outpost", x = -2178, y = 2300},
+	},
 
 	planetTravelPoints = {
 		{name = "Dearic Starport", x = 263.58401, z = 6, y = -2952.1284, interplanetaryTravelAllowed = 1, incomingTravelAllowed = 1},
@@ -418,10 +437,10 @@ talus = {
 	},
 
 	badgeAreas = {
-		{"badge_aqualish_cave",-4425,-1414,30,93},
-		{"badge_creature_village",4300,1020,30,90},
-		{"badge_imp_base",-2185,2383,30,91},
-		{"badge_imp_vs_reb_battle",-2595,3724,30,92},
+		{"badge_aqualish_cave",-4425,-1414,0,30,93},
+		{"badge_creature_village",4300,1020,0,30,90},
+		{"badge_imp_base",-2185,2383,0,30,91},
+		{"badge_imp_vs_reb_battle",-2595,3724,0,30,92},
 	},
 
 	navAreas = {
@@ -434,9 +453,7 @@ talus = {
 		{"broken_atat",-2434,-2218,32},
 		{"broken_bridge",-4046,3663,32},
 		{"broken_flora_harvester",-4350,1542,32},
-		{"broken_walls",1115,1489,32},
 		{"burning_rocks",4310,2563,32},
-		{"crashed_escape_pod",-4984,5753,32},
 		{"crashed_transport",-2400,2033,32},
 		{"debris_central",-1729,-2886,32},
 		{"debris_sw",-1011,-5092,32},
@@ -464,20 +481,21 @@ talus = {
 		{"quarantined_building",3886,-2848,32},
 		{"rebel_camp",3100,-4044,32},
 		{"rebel_installation",2371,-4989,50},
-		{"red_fire",-1833,1437,32},
 		{"ruined_lookout_tower",-4382,2673,32},
 		{"ruins_central_1",-1394,2117,32},
 		{"ruins_central_2",-1600,-540,32},
-		{"ruins_east",5190,-1735,32},
 		{"ruins_nw",-3492,3697,32},
 		{"scientist_camp",-3640,6332,32},
 		{"selonian_camp",145,-5583,32},
 		{"small_moisture_farm",-4916,-4510,32},
-		{"sunken_ruins",-4575,4356,32},
+		{"talus_broken_walls",1115,1489,32},
+		{"talus_crashed_escape_pod",-4984,5753,32},
+		{"talus_ruins_east",5190,-1735,32},
+		{"talus_sunken_ruins",-4575,4356,32},
+		{"talus_worship_stone",-861,1020,32},
 		{"three_stones",-1362,1060,32},
 		{"weapons_depot",-4925,-3119,64},
 		{"wind_generators",-4557,-2906,32},
-		{"worship_stone",-861,1020,32},
 	},
 
 	planetObjects = {
@@ -487,9 +505,10 @@ talus = {
 }
 
 tatooine = {
-
 	weatherEnabled = 1,
 	gcwEnabled = 1,
+
+	outpostRegionNames = { },
 
 	planetTravelPoints = {
 		{name = "Mos Eisley Shuttleport", x = 3416.6914, z = 5, y = -4648.1411, interplanetaryTravelAllowed = 0, incomingTravelAllowed = 1},
@@ -507,20 +526,18 @@ tatooine = {
 	},
 
 	badgeAreas = {
-		{"badge_bens_hut",-4512,-2270,10,12},
-		{"badge_escape_pod",-3930,-4425,10,15},
-		{"badge_krayt_graveyard",7396,4478,10,18},
-		{"badge_krayt_skeleton",-4650,-4363,10,14},
-		{"badge_lars_homestead",-2579,-5500,10,17},
-		{"badge_sarlacc_pit",-6176,-3372,10,16},
-		{"badge_tusken_pool",-3969,6267,10,13},
+		{"badge_bens_hut",-4512,-2270,0,10,12},
+		{"badge_escape_pod",-3930,-4425,0,10,15},
+		{"badge_krayt_graveyard",7396,4478,0,10,18},
+		{"badge_krayt_skeleton",-4650,-4363,0,10,14},
+		{"badge_lars_homestead",-2579,-5500,0,10,17},
+		{"badge_sarlacc_pit",-6176,-3372,0,10,16},
+		{"badge_tusken_pool",-3971,6267,1189178,10,13},
 	},
 
 	navAreas = {
-		{"bounty_hunter_camp",7044,7047,32},
 		{"broken_house",2315,3255,32},
 		{"broken_machinery",-4698,5456,32},
-		{"broken_walls",2980,6465,32},
 		{"building_ruins_1",588,348,50},
 		{"building_ruins_2",6395,195,32},
 		{"buried_building",-2041,2593,32},
@@ -540,6 +557,8 @@ tatooine = {
 		{"rock_pillar",-6449,2614,32},
 		{"ruined_building",-4878,2950,32},
 		{"ruins_and_skeletons",-5723,6483,32},
+		{"tatooine_bounty_hunter_camp",7044,7047,32},
+		{"tatooine_broken_walls",2980,6465,32},
 	},
 
 	planetObjects = {
@@ -551,9 +570,13 @@ tatooine = {
 }
 
 yavin4 = {
-
 	weatherEnabled = 1,
 	gcwEnabled = 1,
+
+	outpostRegionNames = {
+		{name = "@yavin4_region_names:yavin4_mining_outpost", x = -312, y = 4865},
+		{name = "@yavin4_region_names:yavin4_labor_outpost", x = -6925, y = -5707},
+	},
 
 	planetTravelPoints = {
 		{name = "Yavin IV Labor Outpost", x = -6921.6733, z = 73, y = -5726.5161, interplanetaryTravelAllowed = 1, incomingTravelAllowed = 1},
@@ -562,9 +585,9 @@ yavin4 = {
 	},
 
 	badgeAreas = {
-		{"badge_temple_exar_kun",5097,5537,30,23},
-		{"badge_temple_woolamander",519,-646,30,21},
-		{"badge_yav_temple_blueleaf",-875,-2047,30,22},
+		{"badge_temple_exar_kun",5097,5537,0,30,23},
+		{"badge_temple_woolamander",519,-646,0,30,21},
+		{"badge_yav_temple_blueleaf",-875,-2047,0,30,22},
 	},
 
 	navAreas = {
@@ -586,7 +609,6 @@ yavin4 = {
 }
 
 space_corellia = {
-
 	weatherEnabled = 0,
 	gcwEnabled = 0,
 
@@ -599,7 +621,6 @@ space_corellia = {
 }
 
 space_dantooine = {
-
 	weatherEnabled = 0,
 	gcwEnabled = 0,
 
@@ -614,7 +635,6 @@ space_dantooine = {
 }
 
 space_dathomir = {
-
 	weatherEnabled = 0,
 	gcwEnabled = 0,
 
@@ -627,7 +647,6 @@ space_dathomir = {
 }
 
 space_endor = {
-
 	weatherEnabled = 0,
 	gcwEnabled = 0,
 
@@ -640,7 +659,6 @@ space_endor = {
 }
 
 space_lok = {
-
 	weatherEnabled = 0,
 	gcwEnabled = 0,
 
@@ -652,7 +670,6 @@ space_lok = {
 }
 
 space_naboo = {
-
 	weatherEnabled = 0,
 	gcwEnabled = 0,
 
@@ -664,7 +681,6 @@ space_naboo = {
 }
 
 space_tatooine = {
-
 	weatherEnabled = 0,
 	gcwEnabled = 0,
 
@@ -674,7 +690,6 @@ space_tatooine = {
 }
 
 space_yavin4 = {
-
 	weatherEnabled = 0,
 	gcwEnabled = 0,
 

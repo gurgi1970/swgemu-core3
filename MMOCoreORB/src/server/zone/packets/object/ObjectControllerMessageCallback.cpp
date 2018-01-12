@@ -24,7 +24,7 @@ void ObjectControllerMessageCallback::parse(Message* message) {
 	if (client != NULL) {
 		StringBuffer objectCtrl;
 		objectCtrl << "parsing objc type 0x" << hex << type;
-		client->info(objectCtrl.toString());
+		client->debug(objectCtrl.toString());
 	}
 
 	objectControllerCallback = objectMessageControllerFactory->createObject(type, this);
@@ -38,12 +38,12 @@ void ObjectControllerMessageCallback::parse(Message* message) {
 		return;
 	}
 	
-	int newTaskQueue = objectControllerCallback->getTaskQueue();
+	const auto& newTaskQueue = objectControllerCallback->getCustomTaskQueue();
 	
-	if (newTaskQueue > 2)
-		taskqueue = newTaskQueue;
+	if (newTaskQueue.length()) {
+		setCustomTaskQueue(newTaskQueue);
+	}
 	
-
 	try {
 
 		/*StringBuffer objectCtrl;
@@ -83,7 +83,7 @@ void ObjectControllerMessageCallback::run() {
 }
 
 const char* ObjectControllerMessageCallback::getTaskName() {
-	if (objectControllerCallback && (objectControllerCallback != this)) {
+	if (objectControllerCallback != NULL && (objectControllerCallback != this)) {
 		return objectControllerCallback->getTaskName();
 	} else {
 		return Task::getTaskName();

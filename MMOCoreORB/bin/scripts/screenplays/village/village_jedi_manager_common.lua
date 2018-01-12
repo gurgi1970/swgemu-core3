@@ -1,4 +1,5 @@
 local ObjectManager = require("managers.object.object_manager")
+local QuestManager = require("managers.quest.quest_manager")
 
 VillageJediManagerCommon = ScreenPlay:new {
 	forceSensitiveBranches = {
@@ -20,6 +21,23 @@ VillageJediManagerCommon = ScreenPlay:new {
 		"force_sensitive_heightened_senses_luck"
 	}
 }
+
+VILLAGE_PHASE1_SARGUILLO = 1
+VILLAGE_PHASE1_QUHAREK = 2
+VILLAGE_PHASE1_SIVARRA = 3
+VILLAGE_PHASE1_WHIP = 4
+VILLAGE_PHASE2_DAGEERIN = 5
+VILLAGE_PHASE2_QUHAREK = 6
+VILLAGE_PHASE2_WHIP = 7
+VILLAGE_PHASE2_SURVEYOR = 8
+VILLAGE_PHASE3_DAGEERIN = 9
+VILLAGE_PHASE3_QUHAREK = 10
+VILLAGE_PHASE3_SARGUILLO = 11
+VILLAGE_PHASE3_SURVEYOR = 12
+VILLAGE_PHASE4_ENGINEER = 13
+VILLAGE_PHASE4_SARGUILLO_CP = 14
+VILLAGE_PHASE4_SARGUILLO_ER = 15
+VILLAGE_PHASE4_SIVARRA = 16
 
 VILLAGE_JEDI_PROGRESSION_SCREEN_PLAY_STATE_STRING = "VillageJediProgression"
 VILLAGE_JEDI_PROGRESSION_GLOWING = 1
@@ -46,7 +64,7 @@ function VillageJediManagerCommon.isVillageEligible(pPlayer)
 		return false
 	end
 
-	return VillageJediManagerCommon.hasJediProgressionScreenPlayState(pPlayer, VILLAGE_JEDI_PROGRESSION_HAS_VILLAGE_ACCESS)
+	return VillageJediManagerCommon.hasJediProgressionScreenPlayState(pPlayer, VILLAGE_JEDI_PROGRESSION_HAS_VILLAGE_ACCESS) and QuestManager.hasCompletedQuest(pPlayer, QuestManager.quests.FS_VILLAGE_ELDER)
 end
 
 -- Check if the player has the jedi progression screen play state.
@@ -86,8 +104,28 @@ function VillageJediManagerCommon.hasUnlockedBranch(pPlayer, branch)
 	return CreatureObject(pPlayer):hasScreenPlayState(2, "VillageUnlockScreenPlay:" .. branch)
 end
 
+function VillageJediManagerCommon.getUnlockedBranchCount(pPlayer)
+	if (pPlayer == nil) then
+		return 0
+	end
+
+	local count = 0
+
+	for i = 1, #VillageJediManagerCommon.forceSensitiveBranches, 1 do
+		if VillageJediManagerCommon.hasUnlockedBranch(pPlayer, VillageJediManagerCommon.forceSensitiveBranches[i]) then
+			count = count + 1
+		end
+	end
+
+	return count
+end
+
 function VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)
 	if (pPlayer == nil) then
+		return false
+	end
+
+	if (VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer)) then
 		return false
 	end
 
@@ -97,16 +135,42 @@ function VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)
 	return phaseID == lastActiveQuest
 end
 
-function VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+function VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, questId)
 	if (pPlayer == nil) then
 		return
 	end
 
+	local playerID = SceneObject(pPlayer):getObjectID()
 	local phaseID = VillageJediManagerTownship:getCurrentPhaseID()
 	VillageJediManagerCommon.addToActiveQuestList(pPlayer)
-	setQuestStatus(SceneObject(pPlayer):getObjectID() .. ":village:lastActiveQuest", phaseID)
+	setQuestStatus(playerID .. ":village:lastActiveQuest", phaseID)
+
+	if (questId ~= nil and questId ~= "") then
+		setQuestStatus(playerID .. ":village:activeQuestName", questId)
+	end
 
 	CreatureObject(pPlayer):sendSystemMessage("@quest/force_sensitive/utils:quest_accepted")
+end
+
+function VillageJediManagerCommon.getActiveQuestIdThisPhase(pPlayer)
+	if (pPlayer == nil) then
+		return -1
+	end
+
+	local playerID = SceneObject(pPlayer):getObjectID()
+	local questId = getQuestStatus(playerID .. ":village:activeQuestName")
+
+	if (not VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)) then
+		removeQuestStatus(playerID .. ":village:activeQuestName")
+		return -1
+	end
+
+	if (questId == "") then
+		printLuaError("VillageJediManagerCommon.getActiveQuestIdThisPhase unable to grab active questid for player")
+		return -1
+	end
+
+	return tonumber(questId)
 end
 
 function VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer)
@@ -127,6 +191,7 @@ function VillageJediManagerCommon.setCompletedQuestThisPhase(pPlayer)
 
 	local phaseID = VillageJediManagerTownship:getCurrentPhaseID()
 	VillageJediManagerCommon.removeFromActiveQuestList(pPlayer)
+	removeQuestStatus(SceneObject(pPlayer):getObjectID() .. ":village:activeQuestName")
 	setQuestStatus(SceneObject(pPlayer):getObjectID() .. ":village:lastCompletedQuest", phaseID)
 end
 

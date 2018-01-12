@@ -10,6 +10,7 @@
 #include "server/zone/objects/creature/CreatureObject.h"
 #include "server/zone/objects/player/PlayerObject.h"
 #include "server/zone/objects/player/badges/Badge.h"
+#include "server/zone/objects/group/GroupObject.h"
 #include "server/zone/managers/player/PlayerManager.h"
 #include "server/zone/managers/jedi/JediManager.h"
 #include "templates/manager/TemplateManager.h"
@@ -17,6 +18,7 @@
 #include "templates/datatables/DataTableRow.h"
 #include "server/zone/managers/crafting/schematicmap/SchematicMap.h"
 #include "server/zone/packets/creature/CreatureObjectDeltaMessage4.h"
+#include "server/zone/managers/mission/MissionManager.h"
 
 SkillManager::SkillManager()
 : Logger("SkillManager") {
@@ -309,8 +311,9 @@ bool SkillManager::awardSkill(const String& skillName, CreatureObject* creature,
 		// Update Force Power Max.
 		ghost->setForcePowerMax(creature->getSkillMod("jedi_force_power_max"), true);
 
+		ManagedReference<PlayerManager*> playerManager = creature->getZoneServer()->getPlayerManager();
+
 		if (skillName.contains("master")) {
-			ManagedReference<PlayerManager*> playerManager = creature->getZoneServer()->getPlayerManager();
 			if (playerManager != NULL) {
 				const Badge* badge = BadgeList::instance()->get(skillName);
 
@@ -339,13 +342,33 @@ bool SkillManager::awardSkill(const String& skillName, CreatureObject* creature,
 			ghost->setSkillPoints(totalSkillPointsWasted);
 		}
 
-		ManagedReference<PlayerManager*> playerManager = creature->getZoneServer()->getPlayerManager();
 		if (playerManager != NULL) {
 			creature->setLevel(playerManager->calculatePlayerLevel(creature));
 		}
 
 		if (skill->getSkillName().contains("force_sensitive") && skill->getSkillName().contains("_04"))
 			JediManager::instance()->onFSTreeCompleted(creature, skill->getSkillName());
+
+		MissionManager* missionManager = creature->getZoneServer()->getMissionManager();
+
+		if (skill->getSkillName() == "force_title_jedi_rank_02") {
+			if (missionManager != NULL)
+				missionManager->addPlayerToBountyList(creature->getObjectID(), ghost->calculateBhReward());
+		} else if (skill->getSkillName().contains("force_discipline")) {
+			if (missionManager != NULL)
+				missionManager->updatePlayerBountyReward(creature->getObjectID(), ghost->calculateBhReward());
+		} else if (skill->getSkillName().contains("squadleader")) {
+			Reference<GroupObject*> group = creature->getGroup();
+
+			if (group != NULL && group->getLeader() == creature) {
+				Core::getTaskManager()->executeTask([group] () {
+					Locker locker(group);
+
+					group->removeGroupModifiers();
+					group->addGroupModifiers();
+				}, "UpdateGroupModsLambda");
+			}
+		}
 	}
 
 	/// Update client with new values for things like Terrain Negotiation
@@ -362,6 +385,18 @@ bool SkillManager::awardSkill(const String& skillName, CreatureObject* creature,
 	SkillModManager::instance()->verifySkillBoxSkillMods(creature);
 
 	return true;
+}
+
+void SkillManager::removeSkillRelatedMissions(CreatureObject* creature, Skill* skill) {
+	if(skill->getSkillName().hashCode() == STRING_HASHCODE("combat_bountyhunter_investigation_03")) {
+		ManagedReference<ZoneServer*> zoneServer = creature->getZoneServer();
+		if(zoneServer != NULL) {
+			ManagedReference<MissionManager*> missionManager = zoneServer->getMissionManager();
+			if(missionManager != NULL) {
+				missionManager->failPlayerBountyMission(creature->getObjectID());
+			}
+		}
+	}
 }
 
 bool SkillManager::surrenderSkill(const String& skillName, CreatureObject* creature, bool notifyClient) {
@@ -387,6 +422,8 @@ bool SkillManager::surrenderSkill(const String& skillName, CreatureObject* creat
 
 	if (skillName.beginsWith("force_") && !(JediManager::instance()->canSurrenderSkill(creature, skillName)))
 		return false;
+
+	removeSkillRelatedMissions(creature, skill);
 
 	creature->removeSkill(skill, notifyClient);
 
@@ -460,6 +497,29 @@ bool SkillManager::surrenderSkill(const String& skillName, CreatureObject* creat
 		if (playerManager != NULL) {
 			creature->setLevel(playerManager->calculatePlayerLevel(creature));
 		}
+
+		MissionManager* missionManager = creature->getZoneServer()->getMissionManager();
+
+		if (skill->getSkillName() == "force_title_jedi_rank_02") {
+			if (missionManager != NULL)
+				missionManager->removePlayerFromBountyList(creature->getObjectID());
+		} else if (skill->getSkillName().contains("force_discipline")) {
+			if (missionManager != NULL)
+				missionManager->updatePlayerBountyReward(creature->getObjectID(), ghost->calculateBhReward());
+		} else if (skill->getSkillName().contains("squadleader")) {
+			Reference<GroupObject*> group = creature->getGroup();
+
+			if (group != NULL && group->getLeader() == creature) {
+				Core::getTaskManager()->executeTask([group] () {
+					Locker locker(group);
+
+					group->removeGroupModifiers();
+
+					if (group->hasSquadLeader())
+						group->addGroupModifiers();
+				}, "UpdateGroupModsLambda2");
+			}
+		}
 	}
 
 	/// Update client with new values for things like Terrain Negotiation
@@ -478,7 +538,7 @@ bool SkillManager::surrenderSkill(const String& skillName, CreatureObject* creat
 	return true;
 }
 
-void SkillManager::surrenderAllSkills(CreatureObject* creature, bool notifyClient) {
+void SkillManager::surrenderAllSkills(CreatureObject* creature, bool notifyClient, bool removeForceProgression) {
 	ManagedReference<PlayerObject*> ghost = creature->getPlayerObject();
 
 	SkillList* skillList = creature->getSkillList();
@@ -493,6 +553,11 @@ void SkillManager::surrenderAllSkills(CreatureObject* creature, bool notifyClien
 		Skill* skill = copyOfList.get(i);
 
 		if (skill->getSkillPointsRequired() > 0) {
+			if (!removeForceProgression and skill->getSkillName().contains("force_"))
+				continue;
+
+			removeSkillRelatedMissions(creature, skill);
+
 			creature->removeSkill(skill, notifyClient);
 
 			//Remove skill modifiers
@@ -502,8 +567,6 @@ void SkillManager::surrenderAllSkills(CreatureObject* creature, bool notifyClien
 				auto entry = &skillModifiers->elementAt(i);
 				creature->removeSkillMod(SkillModManager::SKILLBOX, entry->getKey(), entry->getValue(), notifyClient);
 			}
-
-			SkillModManager::instance()->verifySkillBoxSkillMods(creature);
 
 			if (ghost != NULL) {
 				//Give the player the used skill points back.
@@ -516,11 +579,37 @@ void SkillManager::surrenderAllSkills(CreatureObject* creature, bool notifyClien
 				//Remove draft schematic groups
 				auto schematicsGranted = skill->getSchematicsGranted();
 				SchematicMap::instance()->removeSchematics(ghost, *schematicsGranted, notifyClient);
-
-				/// update force
-				ghost->setForcePowerMax(creature->getSkillMod("jedi_force_power_max"), true);
 			}
 		}
+	}
+
+	SkillModManager::instance()->verifySkillBoxSkillMods(creature);
+
+	if (ghost != NULL) {
+		//Update maximum experience.
+		updateXpLimits(ghost);
+
+		/// update force
+		ghost->setForcePowerMax(creature->getSkillMod("jedi_force_power_max"), true);
+	}
+
+	ManagedReference<PlayerManager*> playerManager = creature->getZoneServer()->getPlayerManager();
+	if (playerManager != NULL) {
+		creature->setLevel(playerManager->calculatePlayerLevel(creature));
+	}
+
+	MissionManager* missionManager = creature->getZoneServer()->getMissionManager();
+	if (missionManager != NULL)
+		missionManager->removePlayerFromBountyList(creature->getObjectID());
+
+	Reference<GroupObject*> group = creature->getGroup();
+
+	if (group != NULL && group->getLeader() == creature) {
+		Core::getTaskManager()->executeTask([group] () {
+			Locker locker(group);
+
+			group->removeGroupModifiers();
+		}, "UpdateGroupModsLambda3");
 	}
 }
 

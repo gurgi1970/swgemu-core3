@@ -11,6 +11,8 @@ import system.lang.String;
 import system.util.Vector;
 include templates.tangible.StimPackTemplate;
 include server.zone.objects.manufactureschematic.craftingvalues.CraftingValues;
+include templates.SharedObjectTemplate;
+include system.lang.String;
 
 class StimPack extends PharmaceuticalObject {
 	protected float effectiveness;
@@ -62,7 +64,7 @@ class StimPack extends PharmaceuticalObject {
 		float power = getEffectiveness();
 
 		if (applyBattleFatigue) {
-			power = power - (power * patient.calculateBFRatio() * healer.calculateBFRatio());
+			power *= patient.calculateBFRatio();
 		}
 
 		if (isPetStimPack() || isDroidRepairKit()) {

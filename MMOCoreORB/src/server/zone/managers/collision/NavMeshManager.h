@@ -9,7 +9,6 @@
 #define NAVMESHMANAGER_H_
 
 #include "server/zone/objects/pathfinding/NavArea.h"
-#include "server/zone/Zone.h"
 #include "engine/util/u3d/AABB.h"
 #include "server/zone/managers/collision/NavMeshJob.h"
 
@@ -21,20 +20,28 @@ protected:
 	VectorMap<String, Reference<NavMeshJob*> > runningJobs;
 	Mutex jobQueueMutex;
 	bool stopped;
+	ZoneServer* zoneServer;
 
 
 	void startJob(Reference<NavMeshJob*> job);
     void checkJobs();
+
 public:
 	NavMeshManager();
 	~NavMeshManager() { }
-	void initialize(int numThreads);
+	void initialize(int numThreads, ZoneServer* server);
 
-	void enqueueJob(Zone* zone, NavArea* area, AABB areaToBuild, const RecastSettings& recastConfig, const String& queue);
+	void enqueueJob(NavArea* area, AABB areaToBuild, const RecastSettings& recastConfig, const String& queue);
 
 	void cancelJobs(NavArea* area);
 	void cancelAllJobs();
 	void stop();
+
+	bool isStopped() {
+		return stopped;
+	}
+
+	void dumpMeshesToFiles();
 
     static bool AABBEncompasessAABB(const AABB& lhs, const AABB& rhs);
 

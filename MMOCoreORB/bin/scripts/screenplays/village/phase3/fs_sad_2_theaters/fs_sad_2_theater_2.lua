@@ -9,7 +9,7 @@ FsSad2Theater2 = GoToTheater:new {
 	taskName = "FsSad2Theater2",
 	-- GoToTheater properties
 	minimumDistance = 800,
-	maximumDistance = 1200,
+	maximumDistance = 2000,
 	theater = {
 		{ template = "object/static/structure/general/trash_pile_s01.iff", xDiff = -0.9, zDiff = -0.103, yDiff = 0.959, heading = 0 },
 		{ template = "object/static/structure/corellia/corl_tent_hut_s01.iff", xDiff = -1.393, zDiff = 0.011, yDiff = 2.875, heading = 0 },
@@ -25,8 +25,8 @@ FsSad2Theater2 = GoToTheater:new {
 	},
 	createWaypoint = true,
 	waypointDescription = "@quest/quest_journal/fs_quests_sad2:task2",
-	despawnTime = 20 * 60 * 1000, -- 20 minutes
 	activeAreaRadius = 16,
+	flattenLayer = true
 }
 
 function FsSad2Theater2:onObjectsSpawned(pPlayer, spawnedMobileList)

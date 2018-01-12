@@ -52,17 +52,22 @@ class ActiveArea extends SceneObject {
 	 * @param doClose if true a SceneObjectCloseMessage is sent to finish the object
 	 */
 	@dirty
-	public native void sendTo(SceneObject player, boolean doClose) {
+	public native void sendTo(SceneObject player, boolean doClose, boolean forceLoadContainer = true) {
 		
 	}
 
 	@mock
+	@dirty
 	public native abstract void enqueueEnterEvent(SceneObject obj);
 
 	@mock
+	@dirty
 	public native abstract void enqueueExitEvent(SceneObject obj);
 
+	@dirty
 	public native abstract void notifyEnter(SceneObject object);
+
+	@dirty
 	public native abstract void notifyExit(SceneObject object);
 
 	public native void setZone(Zone zone);

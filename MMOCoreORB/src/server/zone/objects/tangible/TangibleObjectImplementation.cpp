@@ -104,7 +104,7 @@ void TangibleObjectImplementation::notifyLoadFromDatabase() {
 }
 
 void TangibleObjectImplementation::sendBaselinesTo(SceneObject* player) {
-	info("sending tano baselines");
+	debug("sending tano baselines");
 
 	TangibleObject* thisPointer = asTangibleObject();
 
@@ -134,6 +134,7 @@ void TangibleObjectImplementation::setFactionStatus(int status) {
 			return;
 
 		uint32 pvpStatusBitmask = creature->getPvpStatusBitmask();
+		uint32 oldStatusBitmask = pvpStatusBitmask;
 
 		if (factionStatus == FactionStatus::COVERT) {
 			creature->sendSystemMessage("@faction_recruiter:covert_complete");
@@ -166,7 +167,10 @@ void TangibleObjectImplementation::setFactionStatus(int status) {
 				creature->sendSystemMessage("@faction_recruiter:on_leave_complete");
 		}
 
-		creature->setPvpStatusBitmask(pvpStatusBitmask);
+		if (oldStatusBitmask != CreatureFlag::NONE)
+			creature->setPvpStatusBitmask(pvpStatusBitmask);
+		else
+			broadcastPvpStatusBitmask(); // Invuln players still need faction changes broadcasted even without the bitmask changing
 
 		Vector<ManagedReference<CreatureObject*> > petsToStore;
 
@@ -187,11 +191,6 @@ void TangibleObjectImplementation::setFactionStatus(int status) {
 					continue;
 				}
 			}
-
-			if (pvpStatusBitmask & CreatureFlag::PLAYER)
-				pvpStatusBitmask &= ~CreatureFlag::PLAYER;
-
-			pet->setPvpStatusBitmask(pvpStatusBitmask);
 		}
 
 		StoreSpawnedChildrenTask* task = new StoreSpawnedChildrenTask(creature, petsToStore);
@@ -199,6 +198,8 @@ void TangibleObjectImplementation::setFactionStatus(int status) {
 
 		ghost->updateInRangeBuildingPermissions();
 	}
+
+	notifyObservers(ObserverEventType::FACTIONCHANGED);
 }
 
 void TangibleObjectImplementation::sendPvpStatusTo(CreatureObject* player) {
@@ -227,7 +228,7 @@ void TangibleObjectImplementation::sendPvpStatusTo(CreatureObject* player) {
 	if (getFactionStatus() == FactionStatus::OVERT && getFutureFactionStatus() == FactionStatus::COVERT)
 		newPvpStatusBitmask |= CreatureFlag::WASDECLARED;
 
-	BaseMessage* pvp = new UpdatePVPStatusMessage(asTangibleObject(), newPvpStatusBitmask);
+	BaseMessage* pvp = new UpdatePVPStatusMessage(asTangibleObject(), player, newPvpStatusBitmask);
 	player->sendMessage(pvp);
 }
 
@@ -242,7 +243,7 @@ void TangibleObjectImplementation::broadcastPvpStatusBitmask() {
 
 		SortedVector<QuadTreeEntry*> closeObjects(closeobjects->size(), 10);
 
-		closeobjects->safeCopyTo(closeObjects);
+		closeobjects->safeCopyReceiversTo(closeObjects, CloseObjectsVector::CREOTYPE);
 
 		for (int i = 0; i < closeObjects.size(); ++i) {
 			SceneObject* obj = cast<SceneObject*>(closeObjects.get(i));
@@ -270,6 +271,27 @@ void TangibleObjectImplementation::setPvpStatusBitmask(uint32 bitmask, bool noti
 	pvpStatusBitmask = bitmask;
 
 	broadcastPvpStatusBitmask();
+
+	if (isPlayerCreature()) {
+		PlayerObject* ghost = asCreatureObject()->getPlayerObject();
+
+		if (ghost == NULL)
+			return;
+
+		if (bitmask & CreatureFlag::PLAYER)
+			bitmask &= ~CreatureFlag::PLAYER;
+
+		for (int i = 0; i < ghost->getActivePetsSize(); i++) {
+			Reference<AiAgent*> pet = ghost->getActivePet(i);
+
+			if (pet == NULL)
+				continue;
+
+			Locker clocker(pet, asTangibleObject());
+
+			pet->setPvpStatusBitmask(bitmask);
+		}
+	}
 }
 
 void TangibleObjectImplementation::setIsCraftedEnhancedItem(bool value) {
@@ -446,7 +468,7 @@ void TangibleObjectImplementation::removeDefender(SceneObject* defender) {
 	//info("trying to remove defender");
 	for (int i = 0; i < defenderList.size(); ++i) {
 		if (defenderList.get(i) == defender) {
-			info("removing defender");
+			debug("removing defender");
 
 			notifyObservers(ObserverEventType::DEFENDERDROPPED, defender);
 
@@ -696,7 +718,7 @@ int TangibleObjectImplementation::healDamage(TangibleObject* healer, int damageT
 	if (returnValue < 0)
 		returnValue = 0;
 
-	setConditionDamage(MAX(0, newConditionDamage), notifyClient);
+	setConditionDamage(Math::max(0.f, newConditionDamage), notifyClient);
 
 	return returnValue;
 }
@@ -806,6 +828,7 @@ Reference<FactoryCrate*> TangibleObjectImplementation::createFactoryCrate(int ma
 
 	crate->setMaxCapacity(maxSize);
 
+
 	if (insertSelf) {
 		if (!crate->transferObject(asTangibleObject(), -1, false)) {
 			crate->destroyObjectFromDatabase(true);
@@ -813,17 +836,19 @@ Reference<FactoryCrate*> TangibleObjectImplementation::createFactoryCrate(int ma
 		}
 	} else {
 		ManagedReference<TangibleObject*> protoclone = cast<TangibleObject*>( objectManager->cloneObject(asTangibleObject()));
+
+		if (protoclone == NULL) {
+			crate->destroyObjectFromDatabase(true);
+			return NULL;
+		}
+
 		/*
 		* I really didn't want to do this this way, but I had no other way of making the text on the crate be white
 		* if the item it contained has yellow magic bit set. So I stripped the yellow magic bit off when the item is placed inside
 		* the crate here, and added it back when the item is extracted from the crate if it is a crafted enhanced item.
 		*/
-		if(protoclone->getIsCraftedEnhancedItem())
+		if(protoclone->getIsCraftedEnhancedItem()) {
 			protoclone->removeMagicBit(false);
-
-		if (protoclone == NULL) {
-			crate->destroyObjectFromDatabase(true);
-			return NULL;
 		}
 
 		protoclone->setParent(NULL);
@@ -1067,14 +1092,16 @@ void TangibleObjectImplementation::addActiveArea(ActiveArea* area) {
 	if (!area->isDeplyoed())
 		area->deploy();
 
+	Locker locker(&containerLock);
+
 	activeAreas.put(area);
 }
 
-void TangibleObjectImplementation::sendTo(SceneObject* player, bool doClose) {
+void TangibleObjectImplementation::sendTo(SceneObject* player, bool doClose, bool forceLoadContainer) {
 	if (isInvisible() && player != asTangibleObject())
 		return;
 
-	SceneObjectImplementation::sendTo(player, doClose);
+	SceneObjectImplementation::sendTo(player, doClose, forceLoadContainer);
 }
 
 bool TangibleObjectImplementation::isCityStreetLamp(){

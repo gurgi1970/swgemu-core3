@@ -6,7 +6,6 @@
 --  - theater  	 			- the script to use for the theater.
 --  - waypointDescription 	- description for the waypoint that is shown for the player.
 --  - mobileList 			- a list of mobiles to spawn around the theater. The list follows the format of the spawn_mobiles module.
---  - despawnTime 			- the time in milliseconds that the theater will remain in the world before being despawned.
 --  - onFailedSpawn 		- function that is called if the spawn of the theater or any element creation fails.
 
 local ObjectManager = require("managers.object.object_manager")
@@ -23,8 +22,8 @@ GoToTheater = Task:new {
 	createWaypoint = true,
 	mobileList = {},
 	mobileListWithLoc = {},
-	despawnTime = 0,
 	activeAreaRadius = 0,
+	flattenLayer = false,
 	onFailedSpawn = nil,
 	onTheaterCreated = nil,
 	onObjectsSpawned = nil,
@@ -34,17 +33,28 @@ GoToTheater = Task:new {
 
 function GoToTheater:taskStart(pPlayer)
 	local zoneName = SceneObject(pPlayer):getZoneName()
-	local spawnPoint = getSpawnArea(zoneName, SceneObject(pPlayer):getWorldPositionX(), SceneObject(pPlayer):getWorldPositionY(), self.minimumDistance, self.maximumDistance, 20, 10, true)
+	local posX = SceneObject(pPlayer):getWorldPositionX()
+	local posY = SceneObject(pPlayer):getWorldPositionY()
+	
+	local spawnPoint = getSpawnArea(zoneName, posX, posY, self.minimumDistance, self.maximumDistance, 20, 10, true)
 	local playerID = SceneObject(pPlayer):getObjectID()
+	local attempts = 0
+	local distDiff = 0
+
+	while (spawnPoint == nil and attempts < 20) do
+		distDiff = distDiff + 25
+		attempts = attempts + 1
+		spawnPoint = getSpawnArea(zoneName, posX, posY, self.minimumDistance, self.maximumDistance + distDiff, 20, 10, true)
+	end
 
 	if (spawnPoint == nil) then
-		printLuaError("GoToTheater:taskStart() for task " .. self.taskName .. ", spawnPoint is nil.")
+		printLuaError("GoToTheater:taskStart() for task " .. self.taskName .. ", failed to get spawn area after 20 attempts using getSpawnArea with coords " .. SceneObject(pPlayer):getWorldPositionX() .. " " .. SceneObject(pPlayer):getWorldPositionY()  .. " on " .. SceneObject(pPlayer):getZoneName() .. ", min dist " .. self.minimumDistance .. ", max dist " .. self.maximumDistance .. ".")
 		self:callFunctionIfNotNil(self.onFailedSpawn, nil, pPlayer)
 		self:finish(pPlayer)
 		return false
 	end
 
-	local pTheater = spawnSceneObject(zoneName, "object/static/structure/nobuild/nobuild_32.iff", spawnPoint[1], spawnPoint[2], spawnPoint[3], 0, 0)
+	local pTheater = spawnTheaterObject(zoneName, spawnPoint[1], spawnPoint[2], spawnPoint[3], self.flattenLayer)
 
 	if (pTheater == nil) then
 		return false
@@ -272,6 +282,8 @@ function GoToTheater:taskFinish(pPlayer)
 	end
 
 	deleteData(playerID .. self.taskName .. "theaterID")
+
+	self:callFunctionIfNotNil(self.onTheaterFinished, nil, pPlayer)
 
 	return true
 end

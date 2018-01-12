@@ -30,6 +30,7 @@
 #include "server/zone/managers/director/DirectorManager.h"
 #include "server/zone/managers/city/CityManager.h"
 #include "server/zone/managers/structure/StructureManager.h"
+#include "server/zone/managers/frs/FrsManager.h"
 
 #include "server/chat/ChatManager.h"
 
@@ -193,7 +194,7 @@ void ZoneServerImplementation::initialize() {
 void ZoneServerImplementation::startZones() {
 	info("Loading zones.");
 
-	SortedVector<String>* enabledZones = configManager->getEnabledZones();
+	auto enabledZones = configManager->getEnabledZones();
 
 	StructureManager* structureManager = StructureManager::instance();
 	structureManager->setZoneServer(_this.getReferenceUnsafeStaticCast());
@@ -249,6 +250,11 @@ void ZoneServerImplementation::startManagers() {
 	//Loads the FactionManager LUA Config.
 	FactionManager::instance()->loadData();
 
+	//Start global screen plays
+	DirectorManager::instance()->loadPersistentEvents();
+	DirectorManager::instance()->loadPersistentStatus();
+	DirectorManager::instance()->startGlobalScreenPlays();
+
 	cityManager->loadCityRegions();
 
 	for (int i = 0; i < zones->size(); ++i) {
@@ -258,12 +264,10 @@ void ZoneServerImplementation::startManagers() {
 		}
 	}
 
-	//Start global screen plays
-	DirectorManager::instance()->loadPersistentEvents();
-	DirectorManager::instance()->loadPersistentStatus();
-	DirectorManager::instance()->startGlobalScreenPlays();
-
 	auctionManager->initialize();
+
+	frsManager = new FrsManager(_this.getReferenceUnsafeStaticCast());
+	frsManager->initialize();
 }
 
 void ZoneServerImplementation::start(int p, int mconn) {
@@ -334,6 +338,7 @@ void ZoneServerImplementation::stopManagers() {
 	auctionManager = NULL;
 	petManager = NULL;
 	reactionManager = NULL;
+	frsManager = NULL;
 	creatureTemplateManager = NULL;
 	dnaManager = NULL;
 	stringIdManager = NULL;
@@ -469,15 +474,10 @@ void ZoneServerImplementation::processMessage(Message* message) {
 	Task* task = zonePacketHandler->generateMessageTask(client, message);
 
 	if (task != NULL) {
-		int queue = ((MessageCallback*)task)->getTaskQueue();
 		auto taskManager = Core::getTaskManager();
 
 		if (taskManager) {
-			if (queue >= 0) {
-				taskManager->executeTask(task, queue);
-			} else {
-				taskManager->executeTask(task);
-			}
+			taskManager->executeTask(task);
 		} else {
 			delete task;
 		}
@@ -576,8 +576,9 @@ Reference<SceneObject*> ZoneServerImplementation::createClientObject(uint32 temp
 	try {
 		//lock(); ObjectManager has its own mutex
 
-		obj = objectManager->createObject(templateCRC, 1, "clientobjects", oid);
+		obj = objectManager->createObject(templateCRC, 1, "clientobjects", oid, false);
 		obj->setClientObject(true);
+		obj->initializeTransientMembers();
 
 		//unlock();
 	} catch (Exception& e) {

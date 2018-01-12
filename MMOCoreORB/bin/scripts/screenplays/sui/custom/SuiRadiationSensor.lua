@@ -149,8 +149,12 @@ function SuiRadiationSensor:getSensor(pPlayer)
 end
 
 function SuiRadiationSensor:giveSensor(pPlayer)
-	if (pPlayer == nil or self:hasSensor(pPlayer)) then
+	if (pPlayer == nil) then
 		return
+	end
+	
+	if (self:hasSensor(pPlayer)) then
+		self:removeSensor(pPlayer)
 	end
 
 	local pDatapad = SceneObject(pPlayer):getSlottedObject("datapad")
@@ -192,6 +196,18 @@ function SuiRadiationSensor:removeSensor(pPlayer)
 	deleteData(playerID .. ":radiationSensorFactor")
 	deleteStringSharedMemory(playerID .. ":radiationSensor:lastDistance")
 	deleteData(playerID .. ":radiationSensorPid")
+end
+
+function SuiRadiationSensor:unsetLocation(pPlayer)
+	local pSensor = self:getSensor(pPlayer)
+
+	if (pSensor ~= nil) then
+		local sensorID = SceneObject(pSensor):getObjectID()
+
+		deleteData(sensorID .. ":locX")
+		deleteData(sensorID .. ":locY")
+		deleteStringSharedMemory(sensorID .. ":locPlanet")
+	end
 end
 
 function SuiRadiationSensor:setLocation(pPlayer, x, y, planet)

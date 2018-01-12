@@ -8,7 +8,7 @@ function villageSivarraPhase4ConvoHandler:getInitialScreen(pPlayer, pNpc, pConvT
 	local healCount = FsVillageDefense:getVillageHealingCount(pPlayer)
 	local pInventory = SceneObject(pPlayer):getSlottedObject("inventory")
 
-	if (VillageJediManagerTownship:getCurrentPhase() ~= 4) then
+	if (VillageJediManagerTownship:getCurrentPhase() ~= 4 or not VillageJediManagerCommon.isVillageEligible(pPlayer)) then
 		return convoTemplate:getScreen("intro_not_eligible")
 	elseif (QuestManager.hasCompletedQuest(pPlayer, QuestManager.quests.FS_COMBAT_HEALING_FINISH)) then
 		return convoTemplate:getScreen("intro_completed_quest")
@@ -24,7 +24,7 @@ function villageSivarraPhase4ConvoHandler:getInitialScreen(pPlayer, pNpc, pConvT
 		return convoTemplate:getScreen("intro_has_no_medic")
 	elseif (QuestManager.hasCompletedQuest(pPlayer, QuestManager.quests.FS_COMBAT_HEALING_1)) then
 		return convoTemplate:getScreen("intro_start_second_set")
-	elseif (VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)) then
+	elseif (VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer) or VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer)) then
 		return convoTemplate:getScreen("intro_has_otherquest")
 	else
 		return convoTemplate:getScreen("intro_begin")
@@ -65,7 +65,7 @@ function villageSivarraPhase4ConvoHandler:runScreenHandlers(pConvTemplate, pPlay
 		QuestManager.completeQuest(pPlayer, QuestManager.quests.FS_COMBAT_HEALING_1)
 		VillageJediManagerCommon.unlockBranch(pPlayer, "force_sensitive_heightened_senses_healing")
 	elseif (screenID == "choose_certain") then
-		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE4_SIVARRA)
 		FsVillageDefense:acceptHealingQuest(pPlayer)
 	elseif (screenID == "choose_continue") then
 		QuestManager.activateQuest(pPlayer, QuestManager.quests.FS_COMBAT_HEALING_2)

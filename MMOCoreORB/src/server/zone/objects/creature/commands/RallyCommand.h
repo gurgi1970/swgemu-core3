@@ -66,7 +66,7 @@ public:
 		for (int i = 0; i < group->getGroupSize(); i++) {
 			ManagedReference<CreatureObject*> member = group->getGroupMember(i);
 
-			if (member == NULL || member->getZone() != leader->getZone())
+			if (member == NULL)
 				continue;
 
 			if (!isValidGroupAbilityTarget(leader, member, true))
@@ -143,7 +143,7 @@ public:
 		SortedVector<QuadTreeEntry*> closeObjects;
 		if (vec != NULL) {
 			closeObjects.removeAll(vec->size(), 10);
-			vec->safeCopyTo(closeObjects);
+			vec->safeCopyReceiversTo(closeObjects, CloseObjectsVector::PLAYERTYPE);
 		} else {
 #ifdef COV_DEBUG
 			info("Null closeobjects vector in RallyCommand::sendRallyCombatSpam", true);

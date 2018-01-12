@@ -9,7 +9,7 @@ FsSad1Theater5 = GoToTheater:new {
 	taskName = "FsSad1Theater5",
 	-- GoToTheater properties
 	minimumDistance = 1000,
-	maximumDistance = 1400,
+	maximumDistance = 2200,
 	theater = {
 		{ template = "object/static/structure/dathomir/mtn_clan_hut_s01.iff", xDiff = 0.896, zDiff = 0.236, yDiff = -0.272, heading = 0 },
 		{ template = "object/static/structure/general/camp_campfire_logs_smoldering_s01.iff", xDiff = 0.089, zDiff = 0.008, yDiff = 0.682, heading = -16.464 },
@@ -25,8 +25,9 @@ FsSad1Theater5 = GoToTheater:new {
 		{ template = "sith_shadow_pirate", minimumDistance = 7, maximumDistance = 12, referencePoint = 0 }
 	},
 	createWaypoint = true,
-	despawnTime = 20 * 60 * 1000, -- 20 minutes
+	waypointDescription = "@quest/quest_journal/fs_quests_sad:task5",
 	activeAreaRadius = 16,
+	flattenLayer = true
 }
 
 function FsSad1Theater5:onObjectsSpawned(pPlayer, spawnedMobileList)

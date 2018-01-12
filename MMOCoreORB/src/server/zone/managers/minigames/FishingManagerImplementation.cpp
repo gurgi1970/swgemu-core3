@@ -35,7 +35,7 @@ int FishingManagerImplementation::checkLocation(CreatureObject* player, int qual
 		angle = angle - 360;
 
 	float randVal = (float)System::random(3);
-	float distance = MIN((MAX(10.0 - (quality / 12.f), 2.1) + randVal), 10.0); // Calculates the Distance, using the Pole's Quality
+	float distance = Math::min((Math::max(10.0 - (quality / 12.f), 2.1) + randVal), 10.0); // Calculates the Distance, using the Pole's Quality
 
 	angle = 2 * M_PI * angle / 360;
 
@@ -1187,14 +1187,8 @@ void FishingManagerImplementation::removeMarker(CreatureObject* player, SceneObj
 					marker->destroyObjectFromDatabase(true);
 				}
 
-				VectorMap<uint64, ManagedReference<SceneObject*> >* objects = marker->getContainerObjects();
-
-				while (objects->size() > 0) {
-					Locker locker(marker->getContainerLock());
-
-					ManagedReference<SceneObject*> object = objects->get((int)0);
-
-					locker.release();
+				while (marker->getContainerObjectsSize() > 0) {
+					ManagedReference<SceneObject*> object = marker->getContainerObject(0);
 
 					if (object->isPersistent()) {
 						object->destroyObjectFromDatabase(true);

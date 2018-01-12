@@ -7,7 +7,9 @@
 
 #include "server/zone/objects/scene/LuaSceneObject.h"
 #include "server/zone/objects/scene/SceneObject.h"
+#include "server/zone/objects/creature/CreatureObject.h"
 #include "server/zone/managers/stringid/StringIdManager.h"
+#include "server/zone/managers/director/DirectorManager.h"
 #include "server/zone/Zone.h"
 #include "server/zone/managers/director/ScreenPlayTask.h"
 
@@ -505,14 +507,19 @@ int LuaSceneObject::playEffect(lua_State* L) {
 
 
 int LuaSceneObject::updateDirection(lua_State* L) {
-	//void updateDirection(float fw, float fx, float fy, float fz);
+	int numberOfArguments = lua_gettop(L) - 1;
 
-	float fz = lua_tonumber(L, -1);
-	float fy = lua_tonumber(L, -2);
-	float fx = lua_tonumber(L, -3);
-	float fw = lua_tonumber(L, -4);
+	if (numberOfArguments == 1) {
+		float angle = lua_tonumber(L, -1);
+		realObject->updateDirection(angle);
+	} else {
+		float fz = lua_tonumber(L, -1);
+		float fy = lua_tonumber(L, -2);
+		float fx = lua_tonumber(L, -3);
+		float fw = lua_tonumber(L, -4);
 
-	realObject->updateDirection(fw, fx, fy, fz);
+		realObject->updateDirection(fw, fx, fy, fz);
+	}
 
 	return 0;
 }
@@ -819,7 +826,12 @@ int LuaSceneObject::getPlayersInRange(lua_State *L) {
 	for (int i = 0; i < closeObjects->size(); ++i) {
 		SceneObject* object = cast<SceneObject*>(closeObjects->get(i).get());
 
-		if (object == NULL ||!object->isPlayerCreature())
+		if (object == NULL || !object->isPlayerCreature())
+			continue;
+
+		CreatureObject* player = object->asCreatureObject();
+
+		if (player == NULL || player->isInvisible())
 			continue;
 
 		numPlayers++;

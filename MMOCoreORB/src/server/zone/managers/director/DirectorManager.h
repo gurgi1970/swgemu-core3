@@ -10,12 +10,12 @@
 
 #include "DirectorSharedMemory.h"
 #include "server/zone/managers/director/QuestStatus.h"
+#include "server/zone/managers/director/ScreenPlayTask.h"
 #include "server/zone/managers/director/QuestVectorMap.h"
 
+#include "system/util/SynchronizedSortedVector.h"
 #include "system/util/SynchronizedHashTable.h"
 #include "system/util/SynchronizedVectorMap.h"
-
-class ScreenPlayTask;
 
 namespace server {
 namespace zone {
@@ -50,6 +50,7 @@ namespace server {
   namespace managers {
    namespace director {
    class PersistentEvent;
+   class ScreenPlayTask;
 
 	class DirectorManager : public Singleton<DirectorManager>, public Object, public Logger, public ReadWriteLock {
 		ThreadLocal<Lua*> localLua;
@@ -58,6 +59,7 @@ namespace server {
 		VectorMap<String, bool> screenPlays;
 		SynchronizedVectorMap<String, Reference<QuestStatus*> > questStatuses;
 		SynchronizedVectorMap<String, Reference<QuestVectorMap*> > questVectorMaps;
+		SynchronizedSortedVector<Reference<ScreenPlayTask*> > screenplayTasks;
 
 #ifdef WITH_STM
 		TransactionalReference<DirectorSharedMemory* > sharedMemory;
@@ -92,10 +94,14 @@ namespace server {
 		String getQuestStatus(const String& keyString);
 		void removeQuestStatus(const String& key);
 
+		String readStringSharedMemory(const String& key);
+		uint64 readSharedMemory(const String& key);
+
 		QuestVectorMap* getQuestVectorMap(const String& keyString);
 		QuestVectorMap* createQuestVectorMap(const String& keyString);
 		void removeQuestVectorMap(const String& keyString);
 
+		Vector<Reference<ScreenPlayTask*> > getObjectEvents(SceneObject* obj);
 		String getStringSharedMemory(const String& key);
 
 		virtual Lua* getLuaInstance();
@@ -191,6 +197,11 @@ namespace server {
 		static int creatureTemplateExists(lua_State* L);
 		static int printLuaError(lua_State* L);
 		static int getSpawnPointInArea(lua_State* L);
+		static int getPlayerByName(lua_State* L);
+		static int sendMail(lua_State* L);
+		static int spawnTheaterObject(lua_State* L);
+		static int getSchematicItemName(lua_State* L);
+		static int getBadgeListByType(lua_State* L);
 
 		// BazaarBot
 		static int bazaarBotListItem(lua_State* L);

@@ -5,7 +5,7 @@ villageWhipPhase2ConvoHandler = conv_handler:new {}
 
 function villageWhipPhase2ConvoHandler:getInitialScreen(pPlayer, pNpc, pConvTemplate)
 	local convoTemplate = LuaConversationTemplate(pConvTemplate)
-	if (VillageJediManagerTownship:getCurrentPhase() ~= 2) then
+	if (VillageJediManagerTownship:getCurrentPhase() ~= 2 or not VillageJediManagerCommon.isVillageEligible(pPlayer)) then
 		return convoTemplate:getScreen("intro_not_eligible")
 	elseif (readData(SceneObject(pPlayer):getObjectID() .. ":failedWhipPhase2") == 1) then
 		return convoTemplate:getScreen("intro_quest_failed")
@@ -15,9 +15,9 @@ function villageWhipPhase2ConvoHandler:getInitialScreen(pPlayer, pNpc, pConvTemp
 		return convoTemplate:getScreen("intro_quest_inprogress")
 	elseif (QuestManager.hasActiveQuest(pPlayer, QuestManager.quests.FS_REFLEX_FETCH_QUEST_03) and not self:hasSupplies(pPlayer)) then
 		return convoTemplate:getScreen("intro_quest_inprogress")
-	elseif (QuestManager.hasActiveQuest(pPlayer, QuestManager.quests.FS_REFLEX_FETCH_QUEST_03) and self:hasSupplies(pPlayer) and FsReflex2:getFetchCount(pPlayer) < 4) then
+	elseif (QuestManager.hasActiveQuest(pPlayer, QuestManager.quests.FS_REFLEX_FETCH_QUEST_03) and self:hasSupplies(pPlayer) and FsReflex2:getFetchCount(pPlayer) < 5) then
 		return convoTemplate:getScreen("intro_quest_continue")
-	elseif (QuestManager.hasActiveQuest(pPlayer, QuestManager.quests.FS_REFLEX_FETCH_QUEST_03) and self:hasSupplies(pPlayer) and FsReflex2:getFetchCount(pPlayer) == 4) then
+	elseif (QuestManager.hasActiveQuest(pPlayer, QuestManager.quests.FS_REFLEX_FETCH_QUEST_03) and self:hasSupplies(pPlayer) and FsReflex2:getFetchCount(pPlayer) == 5) then
 		return convoTemplate:getScreen("intro_quest_completed")
 	elseif (VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer)) then
 		return convoTemplate:getScreen("intro_completed_other_quest")
@@ -47,12 +47,12 @@ function villageWhipPhase2ConvoHandler:runScreenHandlers(pConvTemplate, pPlayer,
 	local clonedConversation = LuaConversationScreen(pConvScreen)
 
 	if (screenID == "here_is_location") then
-		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE2_WHIP)
 		FsReflex2:setFetchCount(pPlayer, 0)
 		FsReflex2:startQuest(pPlayer)
 	elseif (screenID == "intro_quest_failed" or screenID == "beacons_not_reliable") then
 		FsReflex2:restartQuest(pPlayer)
-	elseif ((screenID == "intro_quest_completed" or screenID == "intro_quest_continue") and FsReflex2:getFetchCount(pPlayer) < 5 and self:hasSupplies(pPlayer)) then
+	elseif ((screenID == "intro_quest_completed" or screenID == "intro_quest_continue") and FsReflex2:getFetchCount(pPlayer) < 6 and self:hasSupplies(pPlayer)) then
 		local pInventory = CreatureObject(pPlayer):getSlottedObject("inventory")
 
 		if pInventory ~= nil then
@@ -68,7 +68,7 @@ function villageWhipPhase2ConvoHandler:runScreenHandlers(pConvTemplate, pPlayer,
 
 		if (screenID == "intro_quest_continue") then
 			local fetchCount = FsReflex2:getFetchCount(pPlayer)
-			clonedConversation:setDialogTextDI(5 - fetchCount)
+			clonedConversation:setDialogTextDI(6 - fetchCount)
 			FsReflex2:startNextFetch(pPlayer)
 		end
 	end

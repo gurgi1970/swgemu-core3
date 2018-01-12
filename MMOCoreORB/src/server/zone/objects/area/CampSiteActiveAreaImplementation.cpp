@@ -19,6 +19,8 @@
 #include "server/zone/objects/area/events/CampDespawnTask.h"
 
 void CampSiteActiveAreaImplementation::initializeTransientMembers() {
+	ActiveAreaImplementation::initializeTransientMembers();
+
 	startTasks();
 
 	setAbandoned(abandoned);
@@ -302,13 +304,19 @@ void CampSiteActiveAreaImplementation::assumeOwnership(CreatureObject* player) {
 
 		ManagedReference<StructureObject*> structure = playerGhost->getZoneServer()->getObject(oid).castTo<StructureObject*>();
 
-		if (structure->isCampStructure()) {
+		if (structure != nullptr && structure->isCampStructure()) {
 			player->sendSystemMessage("@camp:sys_already_camping"); // But you already have a camp established elsewhere!
 			return;
 		}
 	}
 
 	Locker clocker(campOwner, _this.getReferenceUnsafeStaticCast());
+
+	auto zone = this->zone;
+
+	if (zone == nullptr) {
+		return;
+	}
 
 	PlayerObject* ownerGhost = campOwner->getPlayerObject();
 

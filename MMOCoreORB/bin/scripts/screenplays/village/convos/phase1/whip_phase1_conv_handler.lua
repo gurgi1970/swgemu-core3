@@ -5,7 +5,7 @@ villageWhipPhase1ConvoHandler = conv_handler:new {}
 
 function villageWhipPhase1ConvoHandler:getInitialScreen(pPlayer, pNpc, pConvTemplate)
 	local convoTemplate = LuaConversationTemplate(pConvTemplate)
-	if (VillageJediManagerTownship:getCurrentPhase() ~= 1) then
+	if (VillageJediManagerTownship:getCurrentPhase() ~= 1 or not VillageJediManagerCommon.isVillageEligible(pPlayer)) then
 		return convoTemplate:getScreen("intro_not_eligible")
 	elseif (readData(SceneObject(pPlayer):getObjectID() .. ":failedWhipPhase1") == 1) then
 		return convoTemplate:getScreen("intro_quest_failed")
@@ -15,7 +15,7 @@ function villageWhipPhase1ConvoHandler:getInitialScreen(pPlayer, pNpc, pConvTemp
 		return convoTemplate:getScreen("intro_quest_continue")
 	elseif (QuestManager.hasCompletedQuest(pPlayer, QuestManager.quests.FS_REFLEX_RESCUE_QUEST_05)) then
 		return convoTemplate:getScreen("intro_quest_completed")
-	elseif (VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer)) then
+	elseif (VillageJediManagerCommon.hasActiveQuestThisPhase(pPlayer) or VillageJediManagerCommon.hasCompletedQuestThisPhase(pPlayer)) then
 		return convoTemplate:getScreen("intro_has_other_quest")
 	else
 		return convoTemplate:getScreen("intro")
@@ -29,7 +29,7 @@ function villageWhipPhase1ConvoHandler:runScreenHandlers(pConvTemplate, pPlayer,
 	local clonedConversation = LuaConversationScreen(pConvScreen)
 
 	if (screenID == "good_place_to_start") then
-		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer)
+		VillageJediManagerCommon.setActiveQuestThisPhase(pPlayer, VILLAGE_PHASE1_WHIP)
 		FsReflex1:setRescueCount(pPlayer, 0)
 		FsReflex1:startQuest(pPlayer)
 	elseif (screenID == "intro_quest_failed" or screenID == "intro_quest_inprogress") then

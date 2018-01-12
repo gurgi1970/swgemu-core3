@@ -43,17 +43,19 @@ void CellPortal::readObject(IffStream* iff) {
 
 CellProperty::CellProperty() : Object(), Logger("CellProperty"), numberOfPortals(0),
 	floorMesh(NULL), appearanceTemplate(NULL), cellID(0), boundingVolume(NULL) {
+	connectedCells.setNoDuplicateInsertPlan();
 
 }
 
 CellProperty::CellProperty(int cellID) : Logger("CellProperty"), numberOfPortals(0), floorMesh(NULL),
 	appearanceTemplate(NULL), cellID(cellID), boundingVolume(NULL) {
+	connectedCells.setNoDuplicateInsertPlan();
 }
 
 CellProperty::CellProperty(const CellProperty& c) : Object(), Logger("CellProperty"),
 	name(c.name), numberOfPortals(c.numberOfPortals), floorMesh(c.floorMesh), appearanceTemplate(c.appearanceTemplate),
 	cellID(c.cellID), boundingVolume(c.boundingVolume), portals(c.portals) {
-
+	connectedCells.setNoDuplicateInsertPlan();
 }
 
 CellProperty& CellProperty::operator=(const CellProperty& c) {
@@ -117,7 +119,7 @@ void CellProperty::loadVersion5(IffStream* iffStream) {
 
 		iffStream->closeForm('PRTL');
 
-		portals.add(portal);
+		portals.emplace(std::move(portal));
 
 	}
 
@@ -166,7 +168,7 @@ void CellProperty::loadVersion4(IffStream* iffStream) {
 
 		iffStream->closeForm('PRTL');
 
-		portals.add(portal);
+		portals.emplace(std::move(portal));
 
 	}
 

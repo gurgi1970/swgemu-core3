@@ -26,6 +26,8 @@ using namespace engine::db;
 
 // http://tinyurl.com/2g9mqh
 
+#define SLOW_QUEUES_COUNT 4
+
 uint32 ObjectManager::serverObjectCrcHashCode = STRING_HASHCODE("SceneObject.serverObjectCRC");
 uint32 ObjectManager::_classNameHashCode = STRING_HASHCODE("_className");
 
@@ -57,9 +59,13 @@ ObjectManager::ObjectManager() : DOBObjectManager() {
 	databaseManager->loadObjectDatabase("questdata", true);
 	databaseManager->loadObjectDatabase("surveys", true);
 	databaseManager->loadObjectDatabase("accounts", true);
+    databaseManager->loadObjectDatabase("pendingmail", true);
+	databaseManager->loadObjectDatabase("credits", true);
+	databaseManager->loadObjectDatabase("navareas", true, 0xFFFF, false);
 
 	ObjectDatabaseManager::instance()->commitLocalTransaction();
 
+	Core::getTaskManager()->initializeCustomQueue("slowQueue", SLOW_QUEUES_COUNT, true);
 
 	loadLastUsedObjectID();
 
@@ -139,6 +145,7 @@ void ObjectManager::registerObjectTypes() {
 	objectFactory.registerObject<PlantObject>(SceneObjectType::GROWABLEPLANT);
 	objectFactory.registerObject<FsCsObject>(SceneObjectType::FSCSOBJECT);
 	objectFactory.registerObject<FsBuffItem>(SceneObjectType::FSBUFFITEM);
+	objectFactory.registerObject<ContractCrate>(SceneObjectType::CONTRACTCRATE);
 
 	objectFactory.registerObject<SlicingTool>(SceneObjectType::SLICINGTOOL);
 	objectFactory.registerObject<SlicingTool>(SceneObjectType::FLOWANALYZER);
@@ -163,7 +170,6 @@ void ObjectManager::registerObjectTypes() {
 
 	objectFactory.registerObject<BuildingObject>(SceneObjectType::BUILDING);
 	objectFactory.registerObject<BuildingObject>(SceneObjectType::CAPITOLBUILDING);
-	objectFactory.registerObject<TutorialBuildingObject>(SceneObjectType::TUTORIALBUILDING);
 	objectFactory.registerObject<HospitalBuildingObject>(SceneObjectType::HOSPITALBUILDING);
 	objectFactory.registerObject<TravelBuildingObject>(SceneObjectType::TRAVELBUILDING);
 	objectFactory.registerObject<RecreationBuildingObject>(SceneObjectType::RECREATIONBUILDING);
@@ -177,6 +183,7 @@ void ObjectManager::registerObjectTypes() {
 	objectFactory.registerObject<BuildingObject>(SceneObjectType::GARAGEBUILDING);
 	objectFactory.registerObject<BuildingObject>(SceneObjectType::SALONBUILDING);
 	objectFactory.registerObject<PoiBuilding>(SceneObjectType::POIBUILDING);
+	objectFactory.registerObject<TutorialBuildingObject>(SceneObjectType::TUTORIALBUILDING);
 
 
 	objectFactory.registerObject<InstallationObject>(SceneObjectType::INSTALLATION);
@@ -494,6 +501,7 @@ SceneObject* ObjectManager::loadObjectFromTemplate(uint32 objectCRC) {
 		databaseManager->addTemporaryObject(object);
 
 		object->setServerObjectCRC(objectCRC);
+		object->initializeContainerObjectsMap();
 		object->loadTemplateData(templateData);
 
 	} catch (Exception& e) {
@@ -792,7 +800,18 @@ void ObjectManager::deSerializeObject(ManagedObject* object, ObjectInputStream* 
 	} catch (Exception& e) {
 		error(e.getMessage());
 		e.printStackTrace();
-		error("could not deserialize object from DB");
+
+		SceneObject* sceno = cast<SceneObject*>(object);
+
+		if (sceno) {
+			String dbName;
+			uint16 tableID = (uint16)(sceno->getObjectID() >> 48);
+			ObjectDatabaseManager::instance()->getDatabaseName(tableID, dbName);
+
+			error("could not deserialize scene object of type: " + String::valueOf(sceno->getGameObjectType()) + " from DB: " + dbName);
+		} else {
+			error("could not deserialize managed object from DB");
+		}
 	} catch (...) {
 		error("could not deserialize object from DB");
 
@@ -825,12 +844,12 @@ SceneObject* ObjectManager::instantiateSceneObject(uint32 objectCRC, uint64 oid,
 	object->setLoggingName(newLogName.toString());
 
 	object->deploy(newLogName.toString());
-	info("deployed.." + newLogName.toString());
+	debug("deployed.." + newLogName.toString());
 
 	return object;
 }
 
-SceneObject* ObjectManager::createObject(uint32 objectCRC, int persistenceLevel, const String& database, uint64 oid) {
+SceneObject* ObjectManager::createObject(uint32 objectCRC, int persistenceLevel, const String& database, uint64 oid, bool initializeTransientMembers) {
 	SceneObject* object = NULL;
 
 	loadTable(database, oid);
@@ -848,11 +867,12 @@ SceneObject* ObjectManager::createObject(uint32 objectCRC, int persistenceLevel,
 		return NULL;
 	}
 
-	object->initializeTransientMembers();
+	object->setPersistent(persistenceLevel);
+
+	if (initializeTransientMembers)
+		object->initializeTransientMembers();
 
 	if (persistenceLevel > 0) {
-		object->setPersistent(persistenceLevel);
-
 		updatePersistentObject(object);
 
 		object->queueUpdateToDatabaseTask();
@@ -881,10 +901,10 @@ ManagedObject* ObjectManager::createObject(const String& className, int persiste
 
 	servant->_serializationHelperMethod();
 
+	object->setPersistent(persistenceLevel);
+
 	if (initializeTransientMembers)
 		object->initializeTransientMembers();
-
-	object->setPersistent(persistenceLevel);
 
 	object->deploy();
 

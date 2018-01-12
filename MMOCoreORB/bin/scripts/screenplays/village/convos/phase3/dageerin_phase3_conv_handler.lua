@@ -6,7 +6,7 @@ villageDageerinPhase3ConvoHandler = conv_handler:new {}
 function villageDageerinPhase3ConvoHandler:getInitialScreen(pPlayer, pNpc, pConvTemplate)
 	local convoTemplate = LuaConversationTemplate(pConvTemplate)
 
-	if (FsSad:hasActiveReturnTask(pPlayer)) then
+	if (FsSad2:hasActiveReturnTask(pPlayer)) then
 		local pGhost = CreatureObject(pPlayer):getPlayerObject()
 
 		if (pGhost ~= nil) then
@@ -14,7 +14,7 @@ function villageDageerinPhase3ConvoHandler:getInitialScreen(pPlayer, pNpc, pConv
 		end
 	end
 
-	if (VillageJediManagerTownship:getCurrentPhase() ~= 3) then
+	if (VillageJediManagerTownship:getCurrentPhase() ~= 3 or not VillageJediManagerCommon.isVillageEligible(pPlayer)) then
 		return convoTemplate:getScreen("intro_not_eligible")
 	elseif (QuestManager.hasCompletedQuest(pPlayer, QuestManager.quests.FS_QUESTS_SAD2_FINISH)) then
 		return convoTemplate:getScreen("intro_completed_quest")
@@ -66,9 +66,13 @@ function villageDageerinPhase3ConvoHandler:runScreenHandlers(pConvTemplate, pPla
 		elseif (screenID == "good_luck") then
 			FsSad2:acceptNextTask(pPlayer)
 		end
+	elseif (screenID == "intro_max_tasks_for_day") then
+		FsSad2:despawnCamp(pPlayer)
 	elseif (screenID == "come_back_when_eliminated" or screenID == "intro_reward") then
 		FsSad2:acceptNextTask(pPlayer)
 	elseif (screenID == "intro_on_task") then
+		SuiRadiationSensor:giveSensor(pPlayer)
+		FsSad2:despawnCamp(pPlayer)
 		FsSad2:recreateCampIfDespawned(pPlayer)
 	end
 

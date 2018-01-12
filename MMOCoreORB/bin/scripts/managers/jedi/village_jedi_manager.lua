@@ -55,6 +55,10 @@ function VillageJediManager:onPlayerLoggedIn(pPlayer)
 
 	Glowing:onPlayerLoggedIn(pPlayer)
 
+	if (VillageJediManagerCommon.isVillageEligible(pPlayer) and not CreatureObject(pPlayer):hasSkill("force_title_jedi_novice")) then
+		awardSkill(pPlayer, "force_title_jedi_novice")
+	end
+
 	if (FsIntro:isOnIntro(pPlayer)) then
 		FsIntro:onLoggedIn(pPlayer)
 	end
@@ -72,7 +76,7 @@ function VillageJediManager:onPlayerLoggedIn(pPlayer)
 		VillageCommunityCrafting:removeSchematics(pPlayer, 2)
 		VillageCommunityCrafting:removeSchematics(pPlayer, 3)
 	end
-	
+
 	JediTrials:onPlayerLoggedIn(pPlayer)
 end
 

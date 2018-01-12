@@ -50,9 +50,7 @@ void StructureManager::loadPlayerStructures(const String& zoneName) {
 	info("Loading player structures from playerstructures.db for zone: " + zoneName);
 
 	ObjectDatabaseManager* dbManager = ObjectDatabaseManager::instance();
-	ObjectDatabase* playerStructuresDatabase =
-			ObjectDatabaseManager::instance()->loadObjectDatabase(
-					"playerstructures", true);
+	ObjectDatabase* playerStructuresDatabase = dbManager->loadObjectDatabase("playerstructures", true);
 
 	if (playerStructuresDatabase == NULL) {
 		error("Could not load the player structures database.");
@@ -142,11 +140,11 @@ int StructureManager::getStructureFootprint(SharedStructureObjectTemplate* objec
 	float bottomRightX = (8 * structureFootprint->getColSize() - centerX);
 	float bottomRightY = -centerY;
 
-	w0 = MIN(topLeftX, bottomRightX);
-	l0 = MIN(topLeftY, bottomRightY);
+	w0 = Math::min(topLeftX, bottomRightX);
+	l0 = Math::min(topLeftY, bottomRightY);
 
-	w1 = MAX(topLeftX, bottomRightX);
-	l1 = MAX(topLeftY, bottomRightY);
+	w1 = Math::max(topLeftX, bottomRightX);
+	l1 = Math::max(topLeftY, bottomRightY);
 
 	Matrix4 translationMatrix;
 	translationMatrix.setTranslation(0, 0, 0);
@@ -174,11 +172,11 @@ int StructureManager::getStructureFootprint(SharedStructureObjectTemplate* objec
 	Vector3 resultBottom = pointBottom * moveAndRotate;
 	Vector3 resultTop = pointTop * moveAndRotate;
 
-	w0 = MIN(resultBottom.getX(), resultTop.getX());
-	l0 = MIN(resultBottom.getZ(), resultTop.getZ());
+	w0 = Math::min(resultBottom.getX(), resultTop.getX());
+	l0 = Math::min(resultBottom.getZ(), resultTop.getZ());
 
-	w1 = MAX(resultTop.getX(), resultBottom.getX());
-	l1 = MAX(resultTop.getZ(), resultBottom.getZ());
+	w1 = Math::max(resultTop.getX(), resultBottom.getX());
+	l1 = Math::max(resultTop.getZ(), resultBottom.getZ());
 
 	//info("objectTemplate:" + objectTemplate->getFullTemplateString() + " :" + structureFootprint->toString(), true);
 	//info("angle:" + String::valueOf(angle) + " w0:" + String::valueOf(w0) + " l0:" + String::valueOf(l0) + " w1:" + String::valueOf(w1) + " l1:" + String::valueOf(l1), true);
@@ -234,7 +232,7 @@ int StructureManager::placeStructureFromDeed(CreatureObject* creature, Structure
 	}
 
 	SortedVector<ManagedReference<QuadTreeEntry*> > inRangeObjects;
-	zone->getInRangeObjects(x, y, 128, &inRangeObjects, true);
+	zone->getInRangeObjects(x, y, 128, &inRangeObjects, true, false);
 
 	float placingFootprintLength0 = 0, placingFootprintWidth0 = 0, placingFootprintLength1 = 0, placingFootprintWidth1 = 0;
 
@@ -617,7 +615,7 @@ Reference<SceneObject*> StructureManager::getInRangeParkingGarage(SceneObject* o
 	CloseObjectsVector* closeObjectsVector = (CloseObjectsVector*) obj->getCloseObjects();
 
 	if (closeObjectsVector == NULL) {
-		zone->getInRangeObjects(obj->getPositionX(), obj->getPositionY(), 128, &closeSceneObjects, true);
+		zone->getInRangeObjects(obj->getPositionX(), obj->getPositionY(), 128, &closeSceneObjects, true, false);
 	} else {
 		closeObjectsVector->safeCopyTo(closeSceneObjects);
 	}
@@ -768,15 +766,9 @@ void StructureManager::moveFirstItemTo(CreatureObject* creature,
 	for (uint32 i = 1; i <= building->getTotalCellNumber(); ++i) {
 		ManagedReference<CellObject*> cell = building->getCell(i);
 
-		int size = cell->getContainerObjectsSize();
-
 		for (int j = 0; j < cell->getContainerObjectsSize(); ++j) {
-			ReadLocker rlocker(cell->getContainerLock());
-
 			ManagedReference<SceneObject*> childObject =
 					cell->getContainerObject(j);
-
-			rlocker.release();
 
 			if (childObject->isVendor())
 				continue;
@@ -953,6 +945,7 @@ void StructureManager::promptNameStructure(CreatureObject* creature,
 	ghost->addSuiBox(inputBox);
 	creature->sendMessage(inputBox->generateMessage());
 }
+
 void StructureManager::promptMaintenanceDroid(StructureObject* structure, CreatureObject* creature) {
 	ManagedReference<PlayerObject*> ghost = creature->getPlayerObject();
 
@@ -1000,8 +993,8 @@ void StructureManager::promptMaintenanceDroid(StructureObject* structure, Creatu
 	creature->sendMessage(box->generateMessage());
 
 }
-void StructureManager::promptPayUncondemnMaintenance(CreatureObject* creature,
-		StructureObject* structure) {
+
+void StructureManager::promptPayUncondemnMaintenance(CreatureObject* creature, StructureObject* structure) {
 	ManagedReference<PlayerObject*> ghost = creature->getPlayerObject();
 
 	if (ghost == NULL) {
@@ -1013,13 +1006,12 @@ void StructureManager::promptPayUncondemnMaintenance(CreatureObject* creature,
 	ManagedReference<SuiMessageBox*> sui = NULL;
 	String text;
 
-	if (creature->getCashCredits() + creature->getBankCredits()
-			>= uncondemnCost) {
+	if (creature->getBankCredits() >= uncondemnCost) {
 		//Owner can un-condemn the structure.
 		sui = new SuiMessageBox(creature, SuiWindowType::STRUCTURE_UNCONDEMN_CONFIRM);
 		if (sui == NULL) {
 			return;
-                }
+		}
 
 		//TODO: investigate sui packets to see if it is possible to send StringIdChatParameter directly.
 		String textStringId =
@@ -1037,7 +1029,7 @@ void StructureManager::promptPayUncondemnMaintenance(CreatureObject* creature,
 		sui = new SuiMessageBox(creature, SuiWindowType::NONE);
 		if (sui == NULL) {
 			return;
-                }
+		}
 
 		//TODO: investigate sui packets to see if it is possible to send StringIdChatParameter directly.
 		String textStringId =
@@ -1059,8 +1051,7 @@ void StructureManager::promptPayUncondemnMaintenance(CreatureObject* creature,
 	creature->sendMessage(sui->generateMessage());
 }
 
-void StructureManager::promptPayMaintenance(StructureObject* structure,
-		CreatureObject* creature, SceneObject* terminal) {
+void StructureManager::promptPayMaintenance(StructureObject* structure, CreatureObject* creature, SceneObject* terminal) {
 	int availableCredits = creature->getCashCredits();
 
 	if (availableCredits <= 0) {
