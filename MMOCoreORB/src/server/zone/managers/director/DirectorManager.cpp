@@ -85,7 +85,6 @@
 #include "server/zone/objects/player/sui/listbox/LuaSuiListBox.h"
 #include "server/zone/objects/tangible/component/lightsaber/LightsaberCrystalComponent.h"
 #include "server/zone/objects/creature/variables/LuaSkill.h"
-<<<<<<< HEAD
 #include "server/zone/objects/manufactureschematic/ManufactureSchematic.h"
 #include "server/zone/objects/draftschematic/DraftSchematic.h"
 #include "server/zone/objects/factorycrate/FactoryCrate.h"
@@ -93,11 +92,9 @@
 #include "server/zone/managers/stringid/StringIdManager.h"
 #include "server/zone/managers/resource/ResourceManager.h"
 #include "server/zone/managers/auction/AuctionManager.h"
-=======
 #include "server/zone/objects/intangible/TheaterObject.h"
 #include "server/zone/objects/tangible/misc/ContractCrate.h"
 #include "server/zone/managers/crafting/schematicmap/SchematicMap.h"
->>>>>>> 4ea1c2d1fd6d1cae0eb56fc028730ce042509a84
 
 int DirectorManager::DEBUG_MODE = 0;
 int DirectorManager::ERROR_CODE = NO_ERROR;
@@ -3576,7 +3573,6 @@ int DirectorManager::sendMail(lua_State* L) {
 	return 0;
 }
 
-<<<<<<< HEAD
 // BazaarBot item listing functionality
 // bazaarBotListItem(pBazaarBot, pObject, pBazzarTerminal, string description, int price)
 int DirectorManager::bazaarBotListItem(lua_State* L) {
@@ -3904,7 +3900,7 @@ int DirectorManager::bazaarBotBuyItem(lua_State* L) {
 	}
 
         return 0;
-=======
+
 int DirectorManager::spawnTheaterObject(lua_State* L) {
 	int numberOfArguments = lua_gettop(L);
 	if (numberOfArguments != 5) {
@@ -4007,5 +4003,4 @@ int DirectorManager::getBadgeListByType(lua_State* L) {
 	}
 
 	return 1;
->>>>>>> 4ea1c2d1fd6d1cae0eb56fc028730ce042509a84
 }
